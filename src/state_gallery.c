@@ -23,6 +23,7 @@
 
 #include "state_camera.h"
 #include "state_gallery.h"
+#include "hicolor.h"
 
 #include "misc_assets.h"
 
@@ -48,6 +49,14 @@ BANKREF(state_gallery)
 VECTOR_DECLARE(used_slots, uint8_t, CAMERA_MAX_IMAGE_SLOTS);
 VECTOR_DECLARE(free_slots, uint8_t, CAMERA_MAX_IMAGE_SLOTS);
 
+static void show_gallery_help(void) {
+#if defined(NINTENDO)
+    menu_text_out(0, 17, HELP_CONTEXT_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " " ICON_B "/" ICON_START " or " ICON_SELECT " for menus");
+#elif defined(SEGA)
+    menu_text_out(0, 17, HELP_CONTEXT_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " " ICON_B " or " ICON_START " for menus");
+#endif
+}
+
 void gallery_toss_images(void) BANKED {
     CAMERA_SWITCH_RAM(CAMERA_BANK_LAST_SEEN);
     memset(used_slots, CAMERA_IMAGE_DELETED, sizeof(used_slots));
@@ -68,17 +77,54 @@ void gallery_toss_images(void) BANKED {
     VECTOR_LEN(used_slots) = j;
     protected_pack(used_slots);
     VECTOR_ITERATE(free_slots, j, elem) protected_modify_slot(elem, CAMERA_IMAGE_DELETED);
+#if defined(COLOR_PHOTOS)
+    color_gallery_refresh();
+#endif
+}
+
+void gallery_delete_picture(uint8_t image_no) BANKED {
+    if (image_no >= gallery_count()) return;
+    uint8_t slot = gallery_slot(image_no);
+#if defined(COLOR_PHOTOS)
+    uint8_t channels[COLOR_CHANNELS];
+    bool group = color_group_read(slot, channels);
+    for (uint8_t i = images_taken(); i; i--) {
+        uint8_t member = VECTOR_GET(used_slots, i - 1);
+        if (member != slot && (!group || (member != channels[0] && member != channels[1] && member != channels[2]))) continue;
+        VECTOR_DEL(used_slots, i - 1);
+        protected_modify_slot(member, CAMERA_IMAGE_DELETED);
+        VECTOR_ADD(free_slots, member);
+    }
+    color_gallery_refresh();
+#else
+    VECTOR_DEL(used_slots, image_no);
+    protected_modify_slot(slot, CAMERA_IMAGE_DELETED);
+    VECTOR_ADD(free_slots, slot);
+#endif
+    protected_pack(used_slots);
+    hicolor_invalidate();
 }
 
 uint8_t gallery_show_picture(uint8_t image_no) {
+    hicolor_stop();
     sync_vblank();
     screen_clear_rect(IMAGE_DISPLAY_X, IMAGE_DISPLAY_Y, CAMERA_IMAGE_TILE_WIDTH, CAMERA_IMAGE_TILE_HEIGHT, WHITE_ON_BLACK);
 
-    if (!images_taken()) return CAMERA_IMAGE_DELETED;
+    if (!gallery_count()) return CAMERA_IMAGE_DELETED;
 
-    uint8_t displayed_index = (image_no < images_taken()) ? image_no : (images_taken() - 1);
+    uint8_t displayed_index = (image_no < gallery_count()) ? image_no : (gallery_count() - 1);
 
-    uint8_t image_index = VECTOR_GET(used_slots, displayed_index);
+    uint8_t image_index = gallery_slot(displayed_index);
+#if defined(COLOR_PHOTOS)
+    uint8_t channels[COLOR_CHANNELS];
+    if (color_group_read(image_index, channels)) {
+        hicolor_begin(image_index);
+        hicolor_draw(image_index, IMAGE_DISPLAY_X, IMAGE_DISPLAY_Y, false);
+        show_gallery_help();
+        hicolor_start();
+        return displayed_index;
+    }
+#endif
     CAMERA_SWITCH_RAM((image_index >> 1) + 1);
     screen_load_image(IMAGE_DISPLAY_X, IMAGE_DISPLAY_Y, CAMERA_IMAGE_TILE_WIDTH, CAMERA_IMAGE_TILE_HEIGHT, ((image_index & 1) ? image_second : image_first));
 
@@ -89,14 +135,18 @@ uint8_t gallery_show_picture(uint8_t image_no) {
 }
 
 uint8_t gallery_show_position(uint8_t image_no) {
-    sprintf(text_buffer, "%hd/%hd", (uint8_t)((image_no < images_taken()) ? (image_no + 1) : 0), (uint8_t)images_taken());
+    sprintf(text_buffer, "%hd/%hd", (uint8_t)((image_no < gallery_count()) ? (image_no + 1) : 0), (uint8_t)gallery_count());
     menu_text_out(HELP_CONTEXT_WIDTH, 17, IMAGE_SLOTS_USED_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, text_buffer);
     return image_no;
 }
 
 uint8_t gallery_print_picture(uint8_t image_no, uint8_t frame_no) BANKED {
-    if (image_no < images_taken()) {
-        uint8_t image_index = VECTOR_GET(used_slots, image_no);
+    if (image_no < gallery_count()) {
+        uint8_t image_index = gallery_slot(image_no);
+#if defined(COLOR_PHOTOS)
+        uint8_t channels[COLOR_CHANNELS];
+        if (color_group_read(image_index, channels)) image_index = channels[1];
+#endif
         if (gbprinter_detect(PRINTER_DETECT_TIMEOUT) == PRN_STATUS_OK) {
             return (gbprinter_print_image(((image_index & 1) ? image_second : image_first),
                                           (image_index >> 1) + 1,
@@ -108,8 +158,18 @@ uint8_t gallery_print_picture(uint8_t image_no, uint8_t frame_no) BANKED {
 }
 
 uint8_t gallery_transfer_picture(uint8_t image_no) BANKED {
-    if (image_no < images_taken()) {
-        uint8_t image_index = VECTOR_GET(used_slots, image_no);
+    if (image_no < gallery_count()) {
+        uint8_t image_index = gallery_slot(image_no);
+#if defined(COLOR_PHOTOS)
+        uint8_t channels[COLOR_CHANNELS];
+        if (color_group_read(image_index, channels)) {
+            for (uint8_t channel = 0; channel != COLOR_CHANNELS; channel++) {
+                uint8_t slot = channels[channel];
+                linkcable_transfer_image((slot & 1) ? image_second : image_first, (slot >> 1) + 1);
+            }
+            return TRUE;
+        }
+#endif
         linkcable_transfer_image(((image_index & 1) ? image_second : image_first), (image_index >> 1) + 1);
         return TRUE;
     }
@@ -155,8 +215,8 @@ uint8_t onShowImageInfo(const menu_t * self, uint8_t * param) {
     static image_metadata_t image_metadata;
     param;
     menu_draw_frame(self);
-    if (OPTION(gallery_picture_idx) < images_taken()) {
-        uint8_t slot = VECTOR_GET(used_slots, OPTION(gallery_picture_idx));
+    if (OPTION(gallery_picture_idx) < gallery_count()) {
+        uint8_t slot = gallery_slot(OPTION(gallery_picture_idx));
         image_metadata.settings = current_settings[OPTION(camera_mode)];
         protected_metadata_read(slot, (uint8_t *)&image_metadata, sizeof(image_metadata));
         if (image_metadata.crc == protected_calculate_crc((uint8_t *)&image_metadata.settings, sizeof(image_metadata.settings), PROTECTED_SEED)) {
@@ -203,6 +263,15 @@ typedef enum {
 uint8_t onHelpGalleryMenu(const struct menu_t * menu, const struct menu_item_t * selection);
 uint8_t onTranslateSubResultGalleryMenu(const struct menu_t * menu, const struct menu_item_t * self, uint8_t value);
 uint8_t onGalleryMenuItemProps(const struct menu_t * menu, const struct menu_item_t * self);
+#if defined(COLOR_PHOTOS)
+uint8_t onExecuteGalleryMenu(const struct menu_t * menu, const struct menu_item_t * self) {
+    menu;
+    if (self->id != idGalleryDelete) return self->result;
+    uint8_t channels[COLOR_CHANNELS];
+    const uint8_t *message = color_group_read(gallery_slot(OPTION(gallery_picture_idx)), channels) ? "Delete all 3 channels?" : "Are you sure?";
+    return menu_execute(&YesNoMenu, (uint8_t *)message, NULL) == MENU_RESULT_YES ? ACTION_ERASE_IMAGE : ACTION_NONE;
+}
+#endif
 
 const menu_item_t GalleryMenuItems[] = {
     {
@@ -251,7 +320,11 @@ const menu_item_t GalleryMenuItems[] = {
         .onGetProps = onGalleryMenuItemProps,
         .result = ACTION_TRANSFER_GALLERY
     }, {
+#if defined(COLOR_PHOTOS)
+        .sub = NULL, .sub_params = NULL,
+#else
         .sub = &YesNoMenu, .sub_params = "Are you sure?",
+#endif
         .ofs_x = 1, .ofs_y = 6, .width = 8,
         .id =  idGalleryDelete,
         .caption = " Delete",
@@ -294,7 +367,10 @@ const menu_t GalleryMenu = {
     .cancel_mask = J_B, .cancel_result = ACTION_NONE,
     .items = GalleryMenuItems, .last_item = LAST_ITEM(GalleryMenuItems),
     .onShow = NULL, .onHelpContext = onHelpGalleryMenu,
-    .onTranslateKey = NULL, .onTranslateSubResult = onTranslateSubResultGalleryMenu
+    .onTranslateKey = NULL, .onTranslateSubResult = onTranslateSubResultGalleryMenu,
+#if defined(COLOR_PHOTOS)
+    .onExecute = onExecuteGalleryMenu
+#endif
 };
 
 uint8_t onTranslateSubResultGalleryMenu(const struct menu_t * menu, const struct menu_item_t * self, uint8_t value) {
@@ -320,7 +396,7 @@ uint8_t onGalleryMenuItemProps(const struct menu_t * menu, const struct menu_ite
         case idGalleryTransferAll:
         case idGalleryDelete:
         case idGalleryDeleteAll:
-            return (images_taken()) ? ITEM_DEFAULT : ITEM_DISABLED;
+            return (gallery_count()) ? ITEM_DEFAULT : ITEM_DISABLED;
         case idGalleryUndeleteAll:
             return (images_taken() < CAMERA_MAX_IMAGE_SLOTS) ? ITEM_DEFAULT : ITEM_DISABLED;
         default:
@@ -337,13 +413,13 @@ uint8_t gallery_print_info(void) {
 }
 
 static uint8_t refresh_screen(void) {
+    hicolor_stop();
+#if defined(COLOR_PHOTOS)
+    color_gallery_refresh();
+#endif
     screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
     menu_text_out(0, 0, DEVICE_SCREEN_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " Camera roll");
-#if defined(NINTENDO)
-    menu_text_out(0, 17, HELP_CONTEXT_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " " ICON_B "/" ICON_START " or " ICON_SELECT " for menus");
-#elif defined(SEGA)
-    menu_text_out(0, 17, HELP_CONTEXT_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " " ICON_B " or " ICON_START " for menus");
-#endif
+    show_gallery_help();
     return gallery_show_position(gallery_show_picture(OPTION(gallery_picture_idx)));
 }
 
@@ -353,9 +429,16 @@ uint8_t INIT_state_gallery(void) BANKED {
 }
 
 uint8_t ENTER_state_gallery(void) BANKED {
+#if defined(COLOR_PHOTOS)
+    hicolor_deferred = true;
+#endif
     OPTION(gallery_picture_idx) = refresh_screen();
     gbprinter_set_handler(onPrinterProgress, BANK(state_gallery));
     fade_in_modal();
+#if defined(COLOR_PHOTOS)
+    hicolor_deferred = false;
+    hicolor_start();
+#endif
     JOYPAD_RESET();
     return 0;
 }
@@ -365,31 +448,33 @@ uint8_t UPDATE_state_gallery(void) BANKED {
     PROCESS_INPUT();
     if (KEY_PRESSED(J_UP) || KEY_PRESSED(J_RIGHT)) {
         // next image
-        if (images_taken() > 1) {
+        if (gallery_count() > 1) {
             PLAY_SFX(sound_menu_alter);
-            if (++OPTION(gallery_picture_idx) == images_taken()) OPTION(gallery_picture_idx) = 0;
+            if (++OPTION(gallery_picture_idx) == gallery_count()) OPTION(gallery_picture_idx) = 0;
             gallery_show_position(gallery_show_picture(OPTION(gallery_picture_idx)));
             save_camera_state();
         }
     } else if (KEY_PRESSED(J_DOWN) || KEY_PRESSED(J_LEFT)) {
         // previous image
-        if (images_taken() > 1) {
+        if (gallery_count() > 1) {
             PLAY_SFX(sound_menu_alter);
-            if (OPTION(gallery_picture_idx)) --OPTION(gallery_picture_idx); else OPTION(gallery_picture_idx) = images_taken() - 1;
+            if (OPTION(gallery_picture_idx)) --OPTION(gallery_picture_idx); else OPTION(gallery_picture_idx) = gallery_count() - 1;
             gallery_show_position(gallery_show_picture(OPTION(gallery_picture_idx)));
             save_camera_state();
         }
     } else if (KEY_PRESSED(J_A)) {
         // switch to thumbnail view
-        if (images_taken()) {
+        if (gallery_count()) {
             PLAY_SFX(sound_ok);
             CHANGE_STATE(state_thumbnails);
             return FALSE;
         }
     } else if (KEY_PRESSED(J_POPUP_MENU)) {
+        hicolor_stop();
         switch (menu_result = menu_execute(&GalleryMenu, NULL, NULL)) {
             case ACTION_ERASE_GALLERY:
-                if (images_taken() != 0) {
+                hicolor_invalidate();
+                if (gallery_count() != 0) {
                     VECTOR_CLEAR(used_slots), VECTOR_CLEAR(free_slots);
                     for (uint8_t i = CAMERA_MAX_IMAGE_SLOTS; i != 0; i--) {
                         protected_modify_slot(i - 1, CAMERA_IMAGE_DELETED);
@@ -399,16 +484,13 @@ uint8_t UPDATE_state_gallery(void) BANKED {
                 } else PLAY_SFX(sound_error);
                 break;
             case ACTION_ERASE_IMAGE:
-                if ((images_taken()) && (OPTION(gallery_picture_idx) < images_taken())) {
-                    uint8_t elem = VECTOR_GET(used_slots, OPTION(gallery_picture_idx));
-                    VECTOR_DEL(used_slots, OPTION(gallery_picture_idx));
-                    protected_modify_slot(elem, CAMERA_IMAGE_DELETED);
-                    VECTOR_ADD(free_slots, elem);
-                    protected_pack(used_slots);
+                if ((gallery_count()) && (OPTION(gallery_picture_idx) < gallery_count())) {
+                    gallery_delete_picture(OPTION(gallery_picture_idx));
                     PLAY_SFX(sound_ok);
                 } else PLAY_SFX(sound_error);
                 break;
             case ACTION_UNERASE_GALLERY:
+                hicolor_invalidate();
                 while (VECTOR_LEN(free_slots)) {
                     uint8_t elem = VECTOR_POP(free_slots);
                     protected_modify_slot(elem, images_taken());
@@ -437,7 +519,7 @@ uint8_t UPDATE_state_gallery(void) BANKED {
                     linkcable_transfer_reset();
                     PLAY_SFX(sound_transmit);
                 }
-                uint8_t transfer_completion = 0, image_count = images_taken();
+                uint8_t transfer_completion = 0, image_count = gallery_count();
                 gallery_show_progressbar(0, 0, PRN_MAX_PROGRESS);
                 for (uint8_t i = 0; i != image_count; i++) {
                     if (!((menu_result == ACTION_TRANSFER_GALLERY) ? gallery_transfer_picture(i) : gallery_print_picture(i, OPTION(print_frame_idx)))) {
@@ -467,6 +549,7 @@ uint8_t UPDATE_state_gallery(void) BANKED {
         }
         OPTION(gallery_picture_idx) = refresh_screen();
     } else if (KEY_PRESSED(J_MAIN_MENU) || KEY_PRESSED(J_B)) {
+        hicolor_stop();
         // run Main Menu
         if (!menu_main_execute()) refresh_screen();
     }
@@ -474,6 +557,8 @@ uint8_t UPDATE_state_gallery(void) BANKED {
 }
 
 uint8_t LEAVE_state_gallery(void) BANKED {
+    hicolor_stop();
+    hicolor_invalidate();
     fade_out_modal();
     gbprinter_set_handler(NULL, 0);
     return 0;

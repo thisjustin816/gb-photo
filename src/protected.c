@@ -195,6 +195,16 @@ void protected_image_owner_write(uint8_t slot) BANKED {
     *cam_image_metadata_echo(slot) = *data;
 }
 
+void protected_capture_metadata_write(uint8_t slot) BANKED {
+    image_metadata_t data;
+    data.raw_regs = SHADOW;
+    data.settings = CURRENT_SETTINGS;
+    data.settings.cpu_fast = _is_CPU_FAST;
+    data.crc = protected_calculate_crc((uint8_t *)&data.settings, sizeof(data.settings), PROTECTED_SEED);
+    protected_metadata_write(slot, (uint8_t *)&data, sizeof(data));
+    protected_image_owner_write(slot);
+}
+
 #define PROTECTED_BLOCK_SIZE(LEN) ((LEN) + sizeof(cam_magic_struct_t))
 
 #define ALBUM_ADDRESS 0xb000        // bank 0

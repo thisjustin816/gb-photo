@@ -41,6 +41,10 @@ LCCFLAGS += -Wl-j -Wl-w -Wm-yoA -Wm-ya16 -autobank -Wb-ext=.rel
 
 CFLAGS = -Iinclude -Iinclude/$(PORT) -Iinclude/$(PLAT) -I$(RESDIR) -Iobj/$(EXT)
 
+ifeq ($(EXT),gbc)
+CFLAGS += -DCOLOR_PHOTOS
+endif
+
 BRANCH      = $(shell git rev-parse --abbrev-ref HEAD)/$(EXT)
 VERSION     = $(shell cat version)
 COMMIT      = $(shell git rev-parse --short HEAD)

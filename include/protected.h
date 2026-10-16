@@ -41,5 +41,6 @@ uint8_t protected_metadata_read(uint8_t slot, uint8_t * dest, uint8_t size) BANK
 uint8_t protected_metadata_write(uint8_t slot, uint8_t * dest, uint8_t size) BANKED;
 void protected_owner_info_write(void) BANKED;
 void protected_image_owner_write(uint8_t slot) BANKED;
+void protected_capture_metadata_write(uint8_t slot) BANKED;
 
 #endif

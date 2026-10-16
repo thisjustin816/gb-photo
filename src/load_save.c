@@ -11,6 +11,7 @@
 #include "state_camera.h"
 #include "load_save.h"
 #include "histogram.h"
+#include "color_photo.h"
 
 BANKREF(module_load_save)
 
@@ -109,6 +110,9 @@ uint8_t INIT_module_load_save(void) BANKED {
     // load camera state
     camera_state = save_structure.state_options;
     memcpy(current_settings, save_structure.mode_settings, sizeof(current_settings));
+#if defined(COLOR_PHOTOS)
+    color_settings_load();
+#endif
     // apply hardware settings
     if (_is_COLOR) {
         if (OPTION(double_speed)) CPU_FAST(); else CPU_SLOW();

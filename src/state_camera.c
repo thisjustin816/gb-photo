@@ -33,6 +33,7 @@
 #include "state_gallery.h"
 #include "pic-n-rec.h"
 #include "load_save.h"
+#include "color_photo.h"
 
 #include "misc_assets.h"
 
@@ -296,6 +297,9 @@ bool image_captured(void) {
     return r;
 }
 void image_capture(void) {
+#if defined(COLOR_PHOTOS)
+    color_request(0);
+#endif
     CAMERA_SWITCH_RAM(CAMERA_BANK_REGISTERS);
     SHADOW.CAM_REG_CAPTURE = CAM_REG_CAPTURE = (CAM00F_POSITIVE | CAM00F_CAPTURING);
     switch (OPTION(after_action)) {
@@ -332,7 +336,6 @@ void camera_scrollbars_reinit(void) {
 
 bool camera_image_save(void) {
     static const uint8_t msgCameraRollFull[] = "Camera roll is full!";
-    static image_metadata_t image_metadata;
     uint8_t n_images = images_taken();
     if (n_images < CAMERA_MAX_IMAGE_SLOTS) {
         // modify index
@@ -343,14 +346,15 @@ bool camera_image_save(void) {
         // generate thumbnail
         protected_generate_thumbnail(slot);
         // save metadata
-        image_metadata.raw_regs = SHADOW;
-        image_metadata.settings = current_settings[OPTION(camera_mode)];
-        image_metadata.settings.cpu_fast = _is_CPU_FAST;
-        image_metadata.crc = protected_calculate_crc((uint8_t *)&image_metadata.settings, sizeof(image_metadata.settings), PROTECTED_SEED);
-        protected_metadata_write(slot, (uint8_t *)&image_metadata, sizeof(image_metadata));
-        protected_image_owner_write(slot);
+        protected_capture_metadata_write(slot);
+#if defined(COLOR_PHOTOS)
+        color_marker_clear(slot);
+#endif
         // add slot to used list
         VECTOR_ADD(used_slots, slot);
+#if defined(COLOR_PHOTOS)
+        color_gallery_refresh();
+#endif
         return true;
     } else {
         music_play_sfx(BANK(sound_error), sound_error, SFX_MUTE_MASK(sound_error), MUSIC_SFX_PRIORITY_HIGH);
@@ -934,6 +938,17 @@ uint8_t onIdleCameraMenu(const struct menu_t * menu, const struct menu_item_t * 
 
     // make the picture if not in progress yet
     if (camera_do_shutter) {
+#if defined(COLOR_PHOTOS)
+        if (_is_COLOR && color_enabled && !recording_video) {
+            reset_shutter();
+            color_capture();
+            camera_do_shutter = capture_triggered = false;
+            refresh_screen();
+            onHelpCameraMenu(menu, selection);
+            image_capture();
+            return ACTION_NONE;
+        }
+#endif
         if (!capture_triggered) {
             music_play_sfx(shutter_sounds[OPTION(shutter_sound)].bank, shutter_sounds[OPTION(shutter_sound)].sound, shutter_sounds[OPTION(shutter_sound)].mask, MUSIC_SFX_PRIORITY_NORMAL);
             if (!image_is_capturing()) image_capture();

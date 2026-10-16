@@ -1,13 +1,13 @@
-name: Build and Package ROM
+name: Build and Release Photo! DX
 
 on:
-  # Allows you to run this workflow manually from the Actions tab
   workflow_dispatch:
-  # Triggers the workflow on push or pull request events but only for the develop branch
-  # push:
-  #   branches: [ develop ]
-  # pull_request:
-  #   branches: [ develop ]
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -18,29 +18,65 @@ jobs:
 
       - name: Install build dependencies
         run: |
-          # Pull GBDK-2020
-          # curl -Lo gbdk-linux64.tar.gz https://github.com/gbdk-2020/gbdk-2020/releases/latest/download/gbdk-linux64.tar.gz
-          curl -Lo gbdk-linux64.tar.gz https://github.com/gbdk-2020/gbdk-2020/releases/download/gbdk-next/gbdk-linux64.tar.gz
-          tar xvfz gbdk-linux64.tar.gz
-          echo "GBDK_HOME=$(pwd)/gbdk" >> $GITHUB_ENV
+          curl --fail --location https://github.com/gbdk-2020/gbdk-2020/releases/download/gbdk-next/gbdk-linux64.tar.gz -o gbdk-linux64.tar.gz
+          tar -xzf gbdk-linux64.tar.gz
+          echo "GBDK_HOME=$(pwd)/gbdk/" >> "$GITHUB_ENV"
           python -m pip install --upgrade Pillow
-          # python -m pip install --upgrade wave
 
       - name: Build the project
         run: |
-          make
+          make gb gbc
         env:
           GBDK_HOME: ${{ env.GBDK_HOME }}
 
-      - name: Remove unnecessary artifacts
+      - name: Package Photo! DX
         run: |
-          find ./build -name "*.noi" -type f -delete
-          find ./build -name "*.map" -type f -delete
-          find ./build -name "*.ihx" -type f -delete
+          for rom in build/gb/photo.gb build/gbc/photo.gbc; do
+            if [[ $(stat -c %s "$rom") -ne 131072 ]]; then
+              echo "::error file=$rom::ROM must be 128 KiB to preserve the flash-roll layout."
+              exit 1
+            fi
+            md5sum "$rom"
+          done
+          mkdir -p build/package build/release
+          cp build/gb/photo.gb 'build/package/Photo! DX (World).gb'
+          cp build/gbc/photo.gbc 'build/package/Photo! DX (World).gbc'
+          cp assets/photo.sav 'build/package/Photo! DX (World).sav'
+          zip -j build/release/photo-dx.zip \
+            'build/package/Photo! DX (World).gb' \
+            'build/package/Photo! DX (World).gbc' \
+            'build/package/Photo! DX (World).sav'
 
       - name: Upload the artifacts
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
-          name: GB Photo! ROM Build
-          path: ./build
+          name: photo-dx
+          path: build/release/photo-dx.zip
+          if-no-files-found: error
           retention-days: 90
+
+  release:
+    if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Download the ROM package
+        uses: actions/download-artifact@v8
+        with:
+          name: photo-dx
+          path: release
+
+      - name: Publish the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          args=("$RELEASE_TAG" release/photo-dx.zip
+            --verify-tag --title "Photo! DX $RELEASE_TAG" --generate-notes)
+          if [[ "$RELEASE_TAG" == *-* ]]; then
+            args+=(--prerelease)
+          fi
+          gh release create "${args[@]}"

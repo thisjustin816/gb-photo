@@ -5,6 +5,7 @@
 #include "screen.h"
 #include "gbcamera.h"
 #include "systemdetect.h"
+#include "hicolor.h"
 
 BANKREF(module_screen)
 BANKREF(module_display_off)
@@ -225,6 +226,9 @@ void screen_load_thumbnail_banked(uint8_t x, uint8_t y, uint8_t * picture, uint8
 }
 
 void LCD_ISR(void) NONBANKED {
+#if defined(COLOR_PHOTOS)
+    if (hicolor_active) { hicolor_scanline(); return; }
+#endif
     while (STAT_REG & STATF_BUSY);
     if (LYC_REG == 95) {
         LCDC_REG |= LCDCF_BG8000;

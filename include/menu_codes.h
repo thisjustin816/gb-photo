@@ -59,6 +59,7 @@
 #define ACTION_RESTORE_DEFAULTS     57
 #define ACTION_SET_DITHERING        58
 #define ACTION_SET_OWNER_INFO       59
+#define ACTION_COLOR_PHOTO          63
 
 // camera actions
 #define ACTION_CAMERA_PRINT         60

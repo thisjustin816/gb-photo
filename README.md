@@ -1,14 +1,22 @@
-![Logo](doc/Images/PHOTO_HD_Logo.svg)
+# Photo! DX
 
-**[The latest release version may be downloaded here](https://github.com/untoxa/gb-photo/releases/latest/)**.
+RGB color photography for Game Boy Camera, based on [Photo! by untoxa and contributors](https://github.com/untoxa/gb-photo).
 
-**[More recent builds may be downloaded from the CI](https://github.com/untoxa/gb-photo/actions)** under the "Build and package ROM" link (you must be logged into github to download the build artifacts). Please note, that those are development builds and may not be properly tested and thus contain imcomplete features or bugs, use them on your own risk.
+**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. The `photo-dx.zip` package contains:
+
+- `Photo! DX (World).gb`: the grayscale Game Boy build.
+- `Photo! DX (World).gbc`: the color build for Game Boy Color and Game Boy Advance.
+- `Photo! DX (World).sav`: a starter save for a new installation. Existing emulator saves can be renamed to match the ROM basename.
+
+**[Development builds](https://github.com/thisjustin816/gb-photo/actions/workflows/build_and_package_rom.yml)** are available as the `photo-dx` artifact after running **Build and Release Photo! DX** manually. GitHub requires sign-in to download Actions artifacts, which are retained for 90 days.
+
+![Photo! upstream logo](doc/Images/PHOTO_HD_Logo.svg)
 
 This project is a homebrew enhancing the capabilities of the Game Boy Camera by allowing access to all the possible parameters of the sensor and improving the printing speed and the camera ergonomics in general. This project is compatible with all known models of Game Boy printer and Game Boy printer emulator. The project features Game Boy And Game Boy Color versions.
 
-A special version compiled for the [Mega Duck, also known as Cougar Boy](https://en.wikipedia.org/wiki/Mega_Duck) is also available. It requires a special adapter that you can build from informations [available here (soon)](https://github.com/bbbbbr/megaduck-info).
+Upstream Photo! also supports the [Mega Duck, also known as Cougar Boy](https://en.wikipedia.org/wiki/Mega_Duck). It requires a special adapter that you can build from informations [available here (soon)](https://github.com/bbbbbr/megaduck-info).
 
-A special version compiled for the [Sega Game Gear](https://en.wikipedia.org/wiki/Game_Gear) is available as well. It requires a special adapter that you can build from informations [available here](https://github.com/untoxa/gamegear-gbcamera-adapter). 
+Upstream Photo! also supports the [Sega Game Gear](https://en.wikipedia.org/wiki/Game_Gear). It requires a special adapter that you can build from informations [available here](https://github.com/untoxa/gamegear-gbcamera-adapter).
 
 This project requires a reflashable Game Boy Camera cart. PCB's and building instructions may be found [in this project](https://github.com/2BitWizard/GB_Mini_Camera) or [in this more detailed fork](https://github.com/Raphael-Boichot/GB_Mini_Camera). Camera modding requires advanced skill in soldering and is not recommended for beginners. [GBxCart flasher from InsideGadget](https://www.gbxcart.com/) is the only known device compatible with camera flashcarts. A generic flashable cartridge is also necessary if you plan to remote control the camera via serial cable.
 
@@ -34,7 +42,7 @@ The Game Gear build of Photo! can be used when flashable Game Boy Cameras are co
 
 # User Manual in brief
 
-The repo contains two sets of roms. One set is compiled for DMG Game boy and Game Boy Pocket and basically features same slow transfer rate and a default "color" palette, as the original camera. The set compiled for Game Boy Color is able to feature Double Speed Mode, very high baudrate transfer mode and features several palettes. The two sets come with a remote control rom allowing to use another Game Boy as controller via the serial cable. You can flash the remote control rom on any flashable cart, it will be compatible. 
+The GB ROM runs on the original Game Boy and Game Boy Pocket with grayscale output. The CGB ROM runs on Game Boy Color and Game Boy Advance, supports Double Speed Mode and additional palettes, and adds RGB color photography.
 
 ## Main hub
 
@@ -89,6 +97,20 @@ The **Transfer** protocol is very similar to standard printing. Only two packets
 
 ### Dithering menu
 - Gives access to custom dithering patterns cooked by some Game Boy Camera artists.
+
+### Color photos (Game Boy Color and Advance)
+
+The CGB ROM adds **Color**, below **Dithering** in the camera popup. It defaults to **Off**. With Color on, a shutter action saves one RGB group: red, green, then blue, using three of the 30 photo slots. Exposure, gain, edge processing, contrast, inversion and dithering stay fixed across the three exposures. Keep the scene and camera still.
+
+The live preview remains the usual four shades in the selected palette. It always requests ordinary brightness, including while Color is on. HiColor conversion runs when a saved color photo or its thumbnail is opened. A progress bar appears during conversion; the result stays cached while that photo or thumbnail page remains open. Menus and printing pause HiColor, and closing a menu restores the cached view.
+
+An emulator implementing the [RGB camera handshake](#rgb-camera-handshake) supplies the three channels automatically. Otherwise Photo! DX discards the initial test exposure and asks for **Red filter, then A**, **Green filter, then A**, and **Blue filter, then A**. Put the requested filter over the lens before pressing A. **B** cancels the entire group. No photo slots are written until all three channels finish. Fewer than three free slots produces **Need 3 free slots!**.
+
+Color capture saves a single group and ends the current repeat or AEB sequence. Camera Print and Transfer actions do not run during this capture; use the gallery afterward. Video actions continue to use ordinary brightness captures.
+
+The CGB gallery and thumbnail view show a complete group once. Deleting it asks for confirmation and removes all three channels. Printing a group prints its green channel. Transferring a group sends three ordinary grayscale images in RGB order; it does not export a combined color image. The GB ROM and older Photo! releases show the three channels separately.
+
+The renderer chooses four representative colors for each 32-pixel-wide, staggered pair of scanlines. Background palette 0 remains available for text and selection marks. This is an approximation of the 64 possible input colors. The selected display palette supplies each component's brightness curve, so equal RGB channels reproduce the same shades as an ordinary photo. Inversion is already present in the saved channel pixels.
 
 ### Owner informations...
 - Gives access the owner informations entered in the save via the regular camera.
@@ -195,9 +217,66 @@ Set the `GBDK_HOME` environment variable which targets your GBDK-2020 folder. Be
 
 Run make from the Cygwin terminal in the project folder containing the `Makefile`:
 
-    make
+    make gb gbc
 
 Your roms will be in `./build` folders, enjoy !
+
+## Publishing Photo! DX
+
+The existing workflow builds `make gb gbc` and checks that both ROMs fit the 128 KiB flash layout. A manual workflow run produces a development download. Pushing a tag beginning with `v` builds and publishes a GitHub Release titled **Photo! DX TAG**, with `photo-dx.zip` attached. Tags containing a hyphen are marked as prereleases.
+
+After committing and pushing the reviewed changes, a prerelease can be published with:
+
+```sh
+git tag v1.13-dx.1
+git push origin v1.13-dx.1
+```
+
+Use a new tag for each release. The workflow verifies that the remote tag exists and creates a new release; it does not replace an existing release's files. A tag such as `v1.13` publishes a stable release. The version in the tag should match the `version` file, with an optional prerelease suffix.
+
+## RGB camera handshake
+
+The CGB ROM reserves **cartridge RAM bank 0, CPU addresses `0xA0F0` through `0xA0FF`**. For a host's flat SRAM buffer, this is offset `0x00F0`. It is outside the stock camera data, Photo! settings and calibration, and the SD register at `0xA000`. The capture register keeps its normal hardware meaning.
+
+| Offset | Bytes | Meaning |
+| --- | --- | --- |
+| 0-3 | `52 47 42 3F` (`RGB?`) | Request magic |
+| 4 | `01` | Request protocol version |
+| 5 | `00` / `01` / `02` / `03` | Brightness / red / green / blue |
+| 6-9 | `48 4F 53 54` (`HOST`) | Host reply magic |
+| 10 | `01` | Host protocol version |
+| 11 | `00` | Reserved reply byte |
+| 12-15 | `00 00 00 00` | Reserved; leave zero |
+
+For **every exposure**, including live preview and ordinary photos:
+
+1. The ROM selects RAM bank 0, writes request bytes 0-5, and clears bytes 6-15.
+2. The ROM selects camera registers and starts an ordinary exposure. In SameBoy, the host inspects the SRAM request in the camera update-request callback, which runs during the capture-register write.
+3. If the request magic and version match, the host supplies the requested component of its source image as brightness. Channel 0 supplies ordinary brightness. It writes `HOST`, version 1, and reserved 0 to bytes 6-11 before completing that exposure.
+4. After capture completes, the ROM accepts only that exact reply. A missing, malformed or unsupported reply selects the physical-filter path. Its unacknowledged exposure is discarded and that channel is prompted and captured again.
+
+The host should freeze its source image across an RGB sequence to avoid channel misalignment. Do not infer channels from capture-register bits or stale requests. In SameBoy, complete a deferred camera request with `GB_camera_updated()` after leaving the update-request callback; the core sets its busy flag after invoking that callback. See the [C harness](tests/sameboy/color_camera.c) for a working host.
+
+## Color storage
+
+Each channel keeps the stock image, thumbnail, owner data, metadata checksums and duplicate checksum blocks. The marker occupies **seven bytes** at `0xAFEB` for the first image or `0xBFEB` for the second image in SRAM banks 1-15:
+
+| Offset | Value |
+| --- | --- |
+| 0-2 | `52 47 42` (`RGB`) |
+| 3 | Marker version `01` |
+| 4 | Channel `01` red, `02` green, `03` blue |
+| 5-6 | Nonzero group ID, little endian |
+
+The marker ends at `0xAFF1` / `0xBFF1`. The following bytes remain available for Photo!'s existing calibration records, including bank 2 at `0xAFF2` and bank 8 at `0xBFF2`. A group is recognized only when the used-slot index contains exactly one valid marker for each channel with the same ID. Slot order does not matter. Incomplete or duplicate-channel groups appear as independent grayscale photos. New IDs also avoid markers in deleted slots. Saving an ordinary photo clears the overwritten slot's marker.
+
+The Color preference occupies bank 0 at `0xA0E0` through `0xA0E5`: `RGBS`, an enabled byte (0 or 1), and its bitwise complement. Missing or invalid data means Off. The existing packed settings format is unchanged.
+
+## Color verification
+
+The renderer follows the continuous interrupt structure of GBDK's `examples/gb/hicolor` and the staggered palette updates described in [GBC HiColour](https://romhack.github.io/doc/gbcHiColour/). Conversion runs on the emulated CPU; the host only supplies camera pixels and checks the result.
+
+The [SameBoy test instructions](tests/sameboy/README.md) cover GB, CGB and the Advance compatibility model, real camera callbacks, filter fallback, stock save compatibility, and a PNG from the running ROM. Other ports are outside this feature's validation scope. Physical camera filters and physical consoles require hardware verification.
 
 # Showcase of images made with Photo!
 ![Showcase](doc/Images/Showcase_2.png)

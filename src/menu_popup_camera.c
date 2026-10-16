@@ -11,6 +11,7 @@
 #include "joy.h"
 
 #include "state_camera.h"
+#include "color_photo.h"
 #include "dither_patterns.h"
 #include "userinfo.h"
 
@@ -45,7 +46,8 @@ typedef enum {
     idPopupActionSaveSD,
     idPopupActionPicNRec,
     idPopupActionPrintPicNRec,
-    idPopupActionPicNRecVideo
+    idPopupActionPicNRecVideo,
+    idPopupCameraColor
 } camera_popup_menu_e;
 
 
@@ -639,8 +641,23 @@ const menu_item_t CameraMenuItems[] = {
         .onGetProps = onCameraPopupMenuItemProps,
         .result = ACTION_SET_DITHERING
     }, {
-        .sub = &UserInfoMenu, .sub_params = NULL,
+#if defined(COLOR_PHOTOS)
+        .sub = NULL, .sub_params = NULL,
         .ofs_x = 1, .ofs_y = 6, .width = 13,
+        .id = idPopupCameraColor,
+        .caption = " Color\t\t%s",
+        .helpcontext = " Capture red, green and blue",
+        .onPaint = onCameraPopupMenuItemPaint,
+        .onGetProps = onCameraPopupMenuItemProps,
+        .result = ACTION_COLOR_PHOTO
+    }, {
+#endif
+        .sub = &UserInfoMenu, .sub_params = NULL,
+#if defined(COLOR_PHOTOS)
+        .ofs_x = 1, .ofs_y = 7, .width = 13,
+#else
+        .ofs_x = 1, .ofs_y = 6, .width = 13,
+#endif
         .id = idPopupCameraOwnerInfo,
         .caption = " Owner information...",
         .helpcontext = " Set camera owner data",
@@ -649,7 +666,11 @@ const menu_item_t CameraMenuItems[] = {
         .result = ACTION_SET_OWNER_INFO
     }, {
         .sub = &YesNoMenu, .sub_params = "Restore defaults?",
+#if defined(COLOR_PHOTOS)
+        .ofs_x = 1, .ofs_y = 8, .width = 13,
+#else
         .ofs_x = 1, .ofs_y = 7, .width = 13,
+#endif
         .id = idPopupCameraRestore,
         .caption = " Restore defaults",
         .helpcontext = " Restore default settings",
@@ -724,6 +745,11 @@ uint8_t * onCameraPopupMenuItemPaint(const struct menu_t * menu, const struct me
     };
 
     switch ((camera_popup_menu_e)self->id) {
+#if defined(COLOR_PHOTOS)
+        case idPopupCameraColor:
+            sprintf(text_buffer, self->caption, color_enabled ? "[On]" : "[Off]");
+            break;
+#endif
         case idPopupCameraRestore:
         case idPopupCameraOwnerInfo:
             strcpy(text_buffer, self->caption);
@@ -752,6 +778,10 @@ uint8_t * onCameraPopupMenuItemPaint(const struct menu_t * menu, const struct me
 uint8_t onCameraPopupMenuItemProps(const struct menu_t * menu, const struct menu_item_t * self) {
     menu;
     switch ((camera_popup_menu_e)self->id) {
+#if defined(COLOR_PHOTOS)
+        case idPopupCameraColor:
+            return _is_COLOR ? ITEM_DEFAULT : ITEM_DISABLED;
+#endif
         case idPopupCameraArea:
             return (OPTION(camera_mode) == camera_mode_auto) ? ITEM_DEFAULT : ITEM_DISABLED;
         default:
@@ -779,6 +809,12 @@ uint8_t menu_popup_camera_execute(void) BANKED {
     spinedit_dither_value = SETTING(dithering);
     uint8_t menu_result;
     switch (menu_result = menu_execute(&CameraPopupMenu, NULL, camera_popup_last_selection)) {
+#if defined(COLOR_PHOTOS)
+        case ACTION_COLOR_PHOTO:
+            color_enabled = !color_enabled;
+            color_settings_save();
+            break;
+#endif
         case ACTION_TRIGGER_TIMER:
             OPTION(shutter_timer) = spinedit_timer_value;
             break;

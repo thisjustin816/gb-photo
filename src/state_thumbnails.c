@@ -25,6 +25,8 @@
 #include "state_camera.h"
 #include "state_thumbnails.h"
 #include "state_gallery.h"
+#include "hicolor.h"
+#include "color_photo.h"
 
 #include "misc_assets.h"
 #include "cursors.h"
@@ -77,9 +79,28 @@ static const thumb_coord_t thumbnail_coords[MAX_PREVIEW_THUMBNAILS] = {
 
 uint8_t onHelpThumbnailMenu(const struct menu_t * menu, const struct menu_item_t * selection);
 uint8_t onTranslateSubResultThumbnailMenu(const struct menu_t * menu, const struct menu_item_t * self, uint8_t value);
+#if defined(COLOR_PHOTOS)
+uint8_t onExecuteThumbnailMenu(const struct menu_t * menu, const struct menu_item_t * self) {
+    menu;
+    if (self->result != ACTION_DELETE_SELECTED) return self->result;
+    const uint8_t *message = "Delete selected?";
+    uint8_t channels[COLOR_CHANNELS];
+    for (uint8_t i = 0; i != gallery_count(); i++) {
+        if (selected_images[i] && color_group_read(gallery_slot(i), channels)) {
+            message = "Delete all channels?";
+            break;
+        }
+    }
+    return menu_execute(&YesNoMenu, (uint8_t *)message, NULL) == MENU_RESULT_YES ? ACTION_DELETE_SELECTED : ACTION_NONE;
+}
+#endif
 const menu_item_t ThumbnailMenuItems[] = {
     {
+#if defined(COLOR_PHOTOS)
+        .sub = NULL, .sub_params = NULL,
+#else
         .sub = &YesNoMenu, .sub_params = "Delete selected?",
+#endif
         .ofs_x = 1, .ofs_y = 1, .width = 11,
         .caption = " Delete selected",
         .helpcontext = " Delete selected images",
@@ -106,7 +127,10 @@ const menu_t ThumbnailMenu = {
     .cancel_mask = J_B, .cancel_result = ACTION_NONE,
     .items = ThumbnailMenuItems, .last_item = LAST_ITEM(ThumbnailMenuItems),
     .onShow = NULL, .onHelpContext = onHelpThumbnailMenu,
-    .onTranslateKey = NULL, .onTranslateSubResult = onTranslateSubResultThumbnailMenu
+    .onTranslateKey = NULL, .onTranslateSubResult = onTranslateSubResultThumbnailMenu,
+#if defined(COLOR_PHOTOS)
+    .onExecute = onExecuteThumbnailMenu
+#endif
 };
 
 uint8_t onTranslateSubResultThumbnailMenu(const struct menu_t * menu, const struct menu_item_t * self, uint8_t value) {
@@ -125,7 +149,7 @@ uint8_t onHelpThumbnailMenu(const struct menu_t * menu, const struct menu_item_t
 
 inline uint8_t selected_count(void) {
     uint8_t image_count = 0;
-    for (uint8_t i = 0; i != images_taken(); i++) image_count += (selected_images[i]) ? 1 : 0;
+    for (uint8_t i = 0; i != gallery_count(); i++) image_count += (selected_images[i]) ? 1 : 0;
     return image_count;
 }
 
@@ -133,7 +157,7 @@ inline uint8_t coords_to_index(uint8_t x, uint8_t y) {
     return (thumbnails_page_no << 4) | (y << 2) | x;
 }
 inline uint8_t coords_to_picture_no(uint8_t x, uint8_t y) {
-    uint8_t image_count = VECTOR_LEN(used_slots);
+    uint8_t image_count = gallery_count();
     if (image_count) {
         uint8_t no = coords_to_index(x, y);
         return (no < image_count) ? no : (image_count - 1);
@@ -141,28 +165,58 @@ inline uint8_t coords_to_picture_no(uint8_t x, uint8_t y) {
 }
 
 void tumbnail_refresh(uint8_t index) {
+    hicolor_stop();
+#if defined(COLOR_PHOTOS)
+    hicolor_begin(0x80 + thumbnails_page_no);
+#endif
     uint8_t pos = index - (thumbnails_page_no * MAX_PREVIEW_THUMBNAILS);
-    if (index < VECTOR_LEN(used_slots)) {
-        uint8_t slot = VECTOR_GET(used_slots, index);
+    if (index < gallery_count()) {
+        uint8_t slot = gallery_slot(index);
         CAMERA_SWITCH_RAM((slot >> 1) + 1);
         screen_load_thumbnail(thumbnail_coords[pos].x, thumbnail_coords[pos].y, ((slot & 1) ? image_second_thumbnail : image_first_thumbnail), 0xFF);
-        if (selected_images[index]) menu_text_out(thumbnail_coords[pos].x + 3, thumbnail_coords[pos].y + 3, 0, WHITE_ON_BLACK, ITEM_DEFAULT, ICON_CBX_CHECKED);
+#if defined(COLOR_PHOTOS)
+        hicolor_draw(slot, thumbnail_coords[pos].x, thumbnail_coords[pos].y, true);
+#endif
+        if (selected_images[index]) {
+            menu_text_out(thumbnail_coords[pos].x + 3, thumbnail_coords[pos].y + 3, 0, WHITE_ON_BLACK, ITEM_DEFAULT, ICON_CBX_CHECKED);
+#if defined(COLOR_PHOTOS)
+            hicolor_ui_cell(thumbnail_coords[pos].x + 3, thumbnail_coords[pos].y + 3);
+#endif
+        }
         screen_restore_rect(thumbnail_coords[pos].x, thumbnail_coords[pos].y, CAMERA_THUMB_TILE_WIDTH, CAMERA_THUMB_TILE_HEIGHT);
     } else {
         screen_clear_rect(thumbnail_coords[pos].x, thumbnail_coords[pos].y, CAMERA_THUMB_TILE_WIDTH, CAMERA_THUMB_TILE_HEIGHT, WHITE_ON_BLACK);
     }
+#if defined(COLOR_PHOTOS)
+    hicolor_start();
+#endif
 }
 
 void thumbnails_diaplay(uint8_t start) {
+    hicolor_stop();
+#if defined(COLOR_PHOTOS)
+    hicolor_begin(0x80 + thumbnails_page_no);
+#endif
     sync_vblank();
     screen_clear_rect(THUMBNAIL_DISPLAY_X, THUMBNAIL_DISPLAY_Y, THUMBNAIL_DISPLAY_WIDTH, THUMBNAIL_DISPLAY_HEIGHT, WHITE_ON_BLACK);
-    for (uint8_t i = start, j = 0; (i < VECTOR_LEN(used_slots)) && (j != MAX_PREVIEW_THUMBNAILS); i++, j++) {
-        uint8_t slot = VECTOR_GET(used_slots, i);
+    for (uint8_t i = start, j = 0; (i < gallery_count()) && (j != MAX_PREVIEW_THUMBNAILS); i++, j++) {
+        uint8_t slot = gallery_slot(i);
         CAMERA_SWITCH_RAM((slot >> 1) + 1);
         screen_load_thumbnail(thumbnail_coords[j].x, thumbnail_coords[j].y, ((slot & 1) ? image_second_thumbnail : image_first_thumbnail), 0xFF);
-        if (selected_images[i]) menu_text_out(thumbnail_coords[j].x + 3, thumbnail_coords[j].y + 3, 0, WHITE_ON_BLACK, ITEM_DEFAULT, ICON_CBX_CHECKED);
+#if defined(COLOR_PHOTOS)
+        hicolor_draw(slot, thumbnail_coords[j].x, thumbnail_coords[j].y, true);
+#endif
+        if (selected_images[i]) {
+            menu_text_out(thumbnail_coords[j].x + 3, thumbnail_coords[j].y + 3, 0, WHITE_ON_BLACK, ITEM_DEFAULT, ICON_CBX_CHECKED);
+#if defined(COLOR_PHOTOS)
+            hicolor_ui_cell(thumbnail_coords[j].x + 3, thumbnail_coords[j].y + 3);
+#endif
+        }
         screen_restore_rect(thumbnail_coords[j].x, thumbnail_coords[j].y, CAMERA_THUMB_TILE_WIDTH, CAMERA_THUMB_TILE_HEIGHT);
     }
+#if defined(COLOR_PHOTOS)
+    hicolor_start();
+#endif
 }
 
 static void refresh_screen(void) {
@@ -171,7 +225,7 @@ static void refresh_screen(void) {
 
     thumbnails_diaplay(thumbnails_page_no * MAX_PREVIEW_THUMBNAILS);
 
-    sprintf(text_buffer, "%hd/%hd", (uint8_t)((OPTION(gallery_picture_idx) < images_taken()) ? (OPTION(gallery_picture_idx) + 1) : 0), (uint8_t)images_taken());
+    sprintf(text_buffer, "%hd/%hd", (uint8_t)((OPTION(gallery_picture_idx) < gallery_count()) ? (OPTION(gallery_picture_idx) + 1) : 0), (uint8_t)gallery_count());
 #if defined(NINTENDO)
     menu_text_out(0, 17, HELP_CONTEXT_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " " ICON_A " select " ICON_START "/" ICON_SELECT " for menus");
 #elif defined(SEGA)
@@ -185,8 +239,11 @@ uint8_t INIT_state_thumbnails(void) BANKED {
 }
 
 uint8_t ENTER_state_thumbnails(void) BANKED {
-    thumbnails_num_pages = VECTOR_LEN(used_slots) >> 4;
-    if (VECTOR_LEN(used_slots) & 0x0f) thumbnails_num_pages++;
+#if defined(COLOR_PHOTOS)
+    hicolor_deferred = true;
+#endif
+    thumbnails_num_pages = gallery_count() >> 4;
+    if (gallery_count() & 0x0f) thumbnails_num_pages++;
 
     thumbnails_page_no = (OPTION(gallery_picture_idx) >> 4);
 
@@ -198,6 +255,10 @@ uint8_t ENTER_state_thumbnails(void) BANKED {
 
     refresh_screen();
     fade_in_modal();
+#if defined(COLOR_PHOTOS)
+    hicolor_deferred = false;
+    hicolor_start();
+#endif
     JOYPAD_RESET();
     return 0;
 }
@@ -239,26 +300,24 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
         return 0;
     } else if (KEY_PRESSED(J_A)) {
         uint8_t idx = coords_to_index(cx, cy);
-        if (idx < VECTOR_LEN(used_slots)) {
+        if (idx < gallery_count()) {
             selected_images[idx] = !selected_images[idx];
             tumbnail_refresh(idx);
         } else PLAY_SFX(sound_error);
     } else if ((KEY_PRESSED(J_POPUP_MENU)) && (selected_image_count = selected_count())) {
+        hicolor_stop();
         switch (menu_result = menu_execute(&ThumbnailMenu, NULL, NULL)) {
             case ACTION_DELETE_SELECTED:
                 for (int8_t i = CAMERA_MAX_IMAGE_SLOTS - 1; i >= 0; i--) {
                     if (selected_images[i]) {
-                        uint8_t elem = VECTOR_GET(used_slots, i);
-                        VECTOR_DEL(used_slots, i);
-                        protected_modify_slot(elem, CAMERA_IMAGE_DELETED);
-                        VECTOR_ADD(free_slots, elem);
+                        gallery_delete_picture(i);
                     }
                 }
                 protected_pack(used_slots);
 
                 // update page count
-                thumbnails_num_pages = VECTOR_LEN(used_slots) >> 4;
-                if (VECTOR_LEN(used_slots) & 0x0f) thumbnails_num_pages++;
+                thumbnails_num_pages = gallery_count() >> 4;
+                if (gallery_count() & 0x0f) thumbnails_num_pages++;
                 // update page no
                 thumbnails_page_no = (coords_to_picture_no(cx, cy) >> 4);
 
@@ -274,7 +333,7 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
                     PLAY_SFX(sound_transmit);
                 }
                 gallery_show_progressbar(0, 0, PRN_MAX_PROGRESS);
-                for (uint8_t i = 0, j = 0; i != images_taken(); i++) {
+                for (uint8_t i = 0, j = 0; i != gallery_count(); i++) {
                     if (!(selected_images[i])) continue;
                     if (!((menu_result == ACTION_TRANSFER_SELECTED) ? gallery_transfer_picture(i) : gallery_print_picture(i, OPTION(print_frame_idx)))) {
                         PLAY_SFX(sound_error);
@@ -302,6 +361,7 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
     }
 #if defined(NINTENDO)
     else if (KEY_PRESSED(J_MAIN_MENU)) {
+        hicolor_stop();
         // run Main Menu
         hide_sprites_range(0, MAX_HARDWARE_SPRITES);
         if (!menu_main_execute()) refresh_screen();
@@ -313,6 +373,8 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
 }
 
 uint8_t LEAVE_state_thumbnails(void) BANKED {
+    hicolor_stop();
+    hicolor_invalidate();
     fade_out_modal();
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
     return 0;
