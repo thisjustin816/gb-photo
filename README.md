@@ -6,6 +6,8 @@ RGB color photography for Game Boy Camera, based on [Photo! by untoxa and contri
 
 **[Development builds](https://github.com/thisjustin816/gb-photo/actions/workflows/build_and_package_rom.yml)** are available as the `photo-dx` artifact after running **Build and Release Photo! DX** manually. GitHub requires sign-in to download Actions artifacts, which are retained for 90 days.
 
+The separate `photo-dx-symbols` artifact contains the matching `.noi` file for emulator debugging.
+
 ![Photo! DX title](doc/Images/Photo_DX_Title.png)
 
 The color title follows the original artist's wordmark, including its lens and the Game Boy behind the P. The menu uses material colors for its icons, with RGB accents on the camera indicator. UI colors do not change the selected photo palette.

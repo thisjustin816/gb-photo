@@ -15,6 +15,9 @@ jobs:
     steps:
       - name: Check out the project source
         uses: actions/checkout@v4
+        with:
+          # Keep branch-name strings from changing the ROM layout between builds.
+          ref: ${{ github.sha }}
 
       - name: Install build dependencies
         run: |
