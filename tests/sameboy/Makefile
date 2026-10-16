@@ -12,7 +12,7 @@ SAVE ?= assets/photo.sav
 CGB_BOOT ?=
 LEGACY_ROM ?=
 LEGACY_SYMBOLS ?=
-SCENARIOS := ui fresh fresh-zero fresh-color normal color filters bad-version cancel-red cancel cancel-blue no-space shuffled incomplete duplicate neutral stress
+SCENARIOS := ui fresh fresh-zero fresh-color fresh-sensor normal color filters bad-version cancel-red cancel cancel-blue no-space shuffled incomplete duplicate neutral stress
 
 .PHONY: all test
 all: $(HARNESS)

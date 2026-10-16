@@ -101,6 +101,8 @@ static bool save_is_blank(void) {
     for (uint8_t bank = 0; bank != 16; bank++) {
         CAMERA_SWITCH_RAM(bank);
         for (const uint8_t *p = (const uint8_t *)0xA000; p != (const uint8_t *)0xC000; p++) {
+            // Bank 0 exposes the live sensor here, independently of saved photos.
+            if (!bank && p == (const uint8_t *)0xA100) p = (const uint8_t *)0xAF00;
             if (*p != 0 && *p != 0xFF) return false;
         }
     }

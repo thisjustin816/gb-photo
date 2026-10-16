@@ -194,6 +194,8 @@ static uint8_t camera_pixel(GB_gameboy_t *gb, uint8_t x, uint8_t y)
 
 static uint8_t memory_read(GB_gameboy_t *gb, uint16_t address, uint8_t value)
 {
+    if (!strcmp(scenario, "fresh-sensor") && !requests[0] && camera_bank == 0 &&
+        address >= 0xA100 && address < 0xAF00) return 0x22;
     GB_registers_t *regs = GB_get_registers(gb);
     if (advance_entry && address == 0x100 && (regs->pc == address || regs->pc == address + 1)) {
         // The shared CGB bootstrap needs Advance's B=1 entry convention.
@@ -483,7 +485,7 @@ int main(int argc, char **argv)
     CHECK(!strcmp(scenario, "normal") || !strcmp(scenario, "color") || !strcmp(scenario, "filters") ||
           !strcmp(scenario, "cancel") || !strcmp(scenario, "no-space") || !strcmp(scenario, "bad-version") ||
           !strcmp(scenario, "compat") || !strcmp(scenario, "gray") || !strcmp(scenario, "fresh") ||
-          !strcmp(scenario, "fresh-zero") || !strcmp(scenario, "fresh-color") || !strcmp(scenario, "stress") ||
+          !strcmp(scenario, "fresh-zero") || !strcmp(scenario, "fresh-color") || !strcmp(scenario, "fresh-sensor") || !strcmp(scenario, "stress") ||
           !strcmp(scenario, "cancel-red") || !strcmp(scenario, "cancel-blue") || !strcmp(scenario, "ui") ||
           !strcmp(scenario, "shuffled") || !strcmp(scenario, "incomplete") || !strcmp(scenario, "duplicate") || !strcmp(scenario, "neutral"), "known scenario");
     if (!strcmp(scenario, "cancel-red")) cancel_channel = 1;
@@ -564,7 +566,7 @@ int main(int argc, char **argv)
     CHECK(requests[0] > 0, "ordinary brightness preview observed");
     CHECK(requests[1] + requests[2] + requests[3] == 0, "Color off does not request an RGB exposure");
     fprintf(stderr, "PASS: %u ordinary preview exposures%s\n", requests[0], !strcmp(scenario, "gray") ? " on GB" : " request channel 0");
-    if (strcmp(scenario, "normal") && strcmp(scenario, "gray") && strcmp(scenario, "fresh") && strcmp(scenario, "fresh-zero")) {
+    if (strcmp(scenario, "normal") && strcmp(scenario, "gray") && strcmp(scenario, "fresh") && strcmp(scenario, "fresh-zero") && strcmp(scenario, "fresh-sensor")) {
         if (strcmp(scenario, "fresh-color")) {
             press(gb, GB_KEY_SELECT);
             for (unsigned i = 0; i < 4; i++) press(gb, GB_KEY_DOWN);
