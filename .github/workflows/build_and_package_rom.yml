@@ -73,7 +73,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          args=("$RELEASE_TAG" release/*.gbc
+          # gh expands file globs again, so protect the filename's literal brackets.
+          asset=$(python -c 'import glob, sys; print(glob.escape(sys.argv[1]))' release/*.gbc)
+          args=("$RELEASE_TAG" "$asset"
             --verify-tag --title "Photo! DX $RELEASE_TAG" --generate-notes)
           if [[ "$RELEASE_TAG" == *-* ]]; then
             args+=(--prerelease)
