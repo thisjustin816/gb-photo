@@ -20,6 +20,7 @@
 
 bool hicolor_active = false;
 bool hicolor_deferred = false;
+bool hicolor_pending = false;
 
 static bool cache_valid, cache_reuse, has_color, restore_slow;
 static uint8_t cache_key, cache_palette, loaded_row;
@@ -37,6 +38,7 @@ static bool histogram_valid;
 static uint16_t rgb_colors[64];
 
 void hicolor_stop(void) BANKED {
+    hicolor_pending = false;
     if (!_is_COLOR) return;
     if (hicolor_active) {
         CRITICAL {
@@ -366,6 +368,8 @@ void hicolor_start(void) BANKED {
     if (!_is_COLOR || !has_color) { hicolor_stop(); return; }
     cache_valid = cache_reuse = true;
     if (hicolor_deferred) return;
+    if (color_ui_depth || palette_faded) { hicolor_pending = true; return; }
+    hicolor_pending = false;
     sync_vblank();
     VBK_REG = 1;
     set_bkg_tiles(2, 1, 16, 16, attributes);

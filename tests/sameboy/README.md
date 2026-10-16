@@ -38,8 +38,10 @@ The C harness drives the production ROM with joypad input. SameBoy's camera call
 
 | Scenario | Checks |
 | --- | --- |
+| `transitions` | Consecutive frames across the title, hub, About, Settings, camera, gallery, and flash storage show complete screens, their fades, or black; the animated hand and live-preview area are excluded |
+| `font-boundary` | Both ROM glyph shifters are relocated in disposable emulator memory to force each of their eight offsets onto a page boundary; all rows, stack cleanup, and ROM-bank restoration are checked |
 | `ui` | Every title pixel, including sprite overlays, matches the original artist's colors at CGB precision; menu artwork matches its compiled reference; title restoration, About, camera and popup transitions; UI attributes leave the live image untouched |
-| `fresh`, `fresh-zero` | FF-filled and zero-filled SRAM initialize an empty roll without corruption; Color defaults to On; ordinary capture, continuing preview, gallery input, and save persistence after a power cycle |
+| `fresh`, `fresh-zero` | FF-filled and zero-filled SRAM initialize an empty roll without corruption; Color, double speed, DMA, fast printing, and IR shutter default to On; CPU speed is applied at boot; ordinary capture, continuing preview, gallery input, and save persistence after a power cycle |
 | `fresh-color` | A new installation takes an RGB photo with Color On by default; preview resumes and the photo survives a power cycle without repairs |
 | `fresh-sensor` | Nonblank live sensor pixels do not turn fresh SRAM into a repaired, full roll; ordinary capture and save persistence still work |
 | `normal` | Preview and shutter request channel 0; one ordinary photo, valid stock checksums, continuing preview, gallery input, and save persistence after a power cycle |
@@ -53,7 +55,7 @@ The C harness drives the production ROM with joypad input. SameBoy's camera call
 | `stress` | Deterministic noisy 64-color fixture exercises uncached quantization, color diversity, approximation error and a five-second conversion ceiling |
 | `compat` | Unmodified v1.12 lists three grayscale photos; all 128 KiB of SRAM stays byte-identical while viewing them |
 
-The matrix also runs `color`, `fresh`, and `ui` with SameBoy's `GB_MODEL_AGB_A`. The shared open-source CGB bootstrap is given Advance's B=1 register convention at ROM entry, and the harness asserts Photo! DX detects Advance. This tests the Advance compatibility model, not a physical GBA or its original boot ROM. Photo! DX releases one versioned `.gbc` ROM for GBC/GBA; no GB ROM or starter save is packaged.
+The matrix also runs `color`, `fresh`, `ui`, and `transitions` with SameBoy's `GB_MODEL_AGB_A`. The shared open-source CGB bootstrap is given Advance's B=1 register convention at ROM entry, and the harness asserts Photo! DX detects Advance. This tests the Advance compatibility model, not a physical GBA or its original boot ROM. Photo! DX releases one versioned `.gbc` ROM for GBC/GBA; no GB ROM or starter save is packaged.
 
 Every background palette-data write while HiColor is active must occur in LCD mode 0 at double speed. This includes menu transitions and animated thumbnail cursor sprites. A failure saves `hblank-failure.png`. The color-bar assertion checks every image pixel, including the tile-addressing split and first/last lines. The detector caught a real cursor-induced overrun with the slower streaming routine before the stack-fed version passed.
 

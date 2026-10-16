@@ -9,6 +9,7 @@
 #include "musicmanager.h"
 #include "joy.h"
 #include "screen.h"
+#include "color_ui.h"
 #include "states.h"
 #include "bankdata.h"
 #include "fade.h"
@@ -476,6 +477,8 @@ static void refresh_usage_indicator(void) {
 }
 
 static void refresh_screen(void) {
+    color_ui_begin();
+    color_ui_clear();
     sync_vblank();
     vwf_set_colors(DMG_WHITE, DMG_BLACK);
     screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
@@ -487,6 +490,7 @@ static void refresh_screen(void) {
 
     // thumbnails
     flasher_refresh_thumbnails();
+    color_ui_end();
 }
 
 void flasher_show_icon(void) {

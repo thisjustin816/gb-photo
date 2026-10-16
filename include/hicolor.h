@@ -8,6 +8,7 @@
 #if defined(COLOR_PHOTOS)
 extern bool hicolor_active;
 extern bool hicolor_deferred;
+extern bool hicolor_pending;
 void hicolor_scanline(void) NONBANKED;
 void hicolor_begin(uint8_t key) BANKED;
 bool hicolor_draw(uint8_t slot, uint8_t x, uint8_t y, bool thumbnail) BANKED;

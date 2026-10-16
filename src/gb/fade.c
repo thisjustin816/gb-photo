@@ -62,13 +62,15 @@ __asm
         ld a, b
         or a
         jr z, 2$
+        cp #4
+        jr c, 0$
+        ld de, #0
+        jr 2$
 0$:
-        res 4, e
-        res 1, d
+        res 5, e
+        res 2, d
         srl d
         rr e
-        res 4, e
-        res 1, d
         dec b
         jr nz, 0$
 2$:
@@ -98,6 +100,9 @@ __endasm;
 
 
 void fade_out_modal(void) BANKED {
+#if defined(COLOR_PHOTOS)
+    if (palette_faded || color_ui_depth) { palette_faded = true; return; }
+#endif
     for(uint8_t index = 0; index != 5; ++index) {
         if (_cpu == CGB_TYPE) {
             CGBFadeToBlackStep(BkgPalette, BCPS_REG_ADDR, index);
@@ -110,6 +115,9 @@ void fade_out_modal(void) BANKED {
         vsync();
         vsync();
     }
+#if defined(COLOR_PHOTOS)
+    palette_faded = true;
+#endif
 }
 
 void fade_in_modal(void) BANKED {
@@ -125,4 +133,7 @@ void fade_in_modal(void) BANKED {
         vsync();
         vsync();
     }
+#if defined(COLOR_PHOTOS)
+    palette_faded = false;
+#endif
 }

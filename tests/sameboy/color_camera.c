@@ -26,6 +26,9 @@ static unsigned first_active_frame;
 static unsigned cancel_channel = 2;
 static unsigned printed_green_rows;
 static bool advance_entry;
+static uint32_t transition_frames[100][160 * 144];
+static unsigned transition_count;
+static bool record_transition;
 
 static void printed_image(GB_gameboy_t *gb, uint32_t *image, uint8_t height,
                           uint8_t top, uint8_t bottom, uint8_t exposure)
@@ -234,6 +237,8 @@ static void frames(GB_gameboy_t *gb, unsigned count)
     while (count--) {
         GB_run_frame(gb);
         frame_number++;
+        if (record_transition && transition_count < 100)
+            memcpy(transition_frames[transition_count++], pixels, sizeof(pixels));
         if (hicolor_address && wram[hicolor_address - 0xC000] && !first_active_frame) first_active_frame = frame_number;
         if (pending_capture) {
             pending_capture = false;
@@ -440,6 +445,138 @@ static void ui_pixels(const char *name, unsigned x0, unsigned y0, unsigned width
     fclose(file);
 }
 
+static void transition(GB_gameboy_t *gb, GB_key_t key, const char *name)
+{
+    uint32_t before[160 * 144];
+    memcpy(before, pixels, sizeof(before));
+    transition_count = 0;
+    record_transition = true;
+    press(gb, key);
+    record_transition = false;
+    unsigned bad = 0;
+    for (unsigned f = 0; f < transition_count; f++) {
+        unsigned old = 31, next = 31;
+        bool black = true;
+        for (unsigned y = 0; y < 128; y++) for (unsigned x = 0; x < 160; x++) {
+            /* The hub's hand animates independently of its background. */
+            if (y >= 56 && y < 96) continue;
+            if (strstr(name, "flash") && x >= 32 && x < 50 && y >= 24 && y < 42) continue;
+            if (strstr(name, "camera") && x >= 8 && x < 152 && y >= 8) continue;
+            unsigned p = y * 160 + x;
+            unsigned mask = 0x7FFF;
+            for (unsigned step = 0; step < 5; step++) {
+                unsigned r = mask & 31, g = (mask >> 5) & 31, b = mask >> 10;
+                uint32_t rgb_mask = (((r << 3) | (r >> 2)) << 16) |
+                                    (((g << 3) | (g >> 2)) << 8) | (b << 3) | (b >> 2);
+                if (transition_frames[f][p] != (before[p] & rgb_mask)) old &= ~(1u << step);
+                if (transition_frames[f][p] != (pixels[p] & rgb_mask)) next &= ~(1u << step);
+                mask = step == 3 ? 0 : (mask & ~0x420u) >> 1;
+            }
+            black &= (transition_frames[f][p] & 0xFFFFFF) == 0;
+        }
+        if (!old && !next && !black) bad++;
+        if (getenv("PHOTO_TRANSITION_FRAMES")) {
+            uint32_t after[160 * 144];
+            memcpy(after, pixels, sizeof(after));
+            memcpy(pixels, transition_frames[f], sizeof(pixels));
+            char path[160];
+            snprintf(path, sizeof(path), "build/tests/%s-%03u.png", name, f);
+            screenshot(path);
+            memcpy(pixels, after, sizeof(pixels));
+        }
+    }
+    fprintf(stderr, "%s: %u mixed frames out of %u\n", name, bad, transition_count);
+    CHECK(!bad, "scene transition shows only complete old/new screens or black");
+}
+
+static void transitions_test(GB_gameboy_t *gb)
+{
+    transition(gb, GB_KEY_START, "title-hub");
+    transition(gb, GB_KEY_B, "hub-title");
+    transition(gb, GB_KEY_START, "title-hub-again");
+    for (unsigned i = 0; i < 4; i++) press(gb, GB_KEY_RIGHT);
+    transition(gb, GB_KEY_A, "hub-about");
+    transition(gb, GB_KEY_B, "about-hub");
+    press(gb, GB_KEY_LEFT);
+    transition(gb, GB_KEY_A, "hub-settings");
+    transition(gb, GB_KEY_B, "settings-hub");
+    for (unsigned i = 0; i < 3; i++) press(gb, GB_KEY_LEFT);
+    transition(gb, GB_KEY_A, "hub-camera");
+    CHECK(GB_read_memory(gb, symbol("_CURRENT_PROGRAM_STATE")) == 3, "transition enters camera");
+    transition(gb, GB_KEY_B, "camera-hub");
+    press(gb, GB_KEY_RIGHT);
+    transition(gb, GB_KEY_A, "hub-gallery");
+    CHECK(GB_read_memory(gb, symbol("_CURRENT_PROGRAM_STATE")) == 1, "transition enters gallery");
+    transition(gb, GB_KEY_B, "gallery-hub");
+    press(gb, GB_KEY_RIGHT);
+    transition(gb, GB_KEY_A, "hub-flash");
+    CHECK(GB_read_memory(gb, symbol("_CURRENT_PROGRAM_STATE")) == 4, "transition enters flash storage");
+    transition(gb, GB_KEY_B, "flash-hub");
+    fprintf(stderr, "PASS: consecutive scene-transition frames contain no partial redraws\n");
+}
+
+static void font_boundary_test(GB_gameboy_t *gb)
+{
+    uint8_t *rom = GB_get_direct_access(gb, GB_DIRECT_ACCESS_ROM, NULL, NULL);
+    const char *names[] = {"_vwf_print_shift_char_right", "_vwf_print_shift_char_left", "_vwf_swap_tiles"};
+    for (unsigned direction = 0; direction < 2; direction++) {
+        unsigned start = symbol(names[direction]), length = symbol(names[direction + 1]) - start;
+        uint8_t code[128];
+        CHECK(length < sizeof(code), "glyph shifter fits relocation fixture");
+        memcpy(code, rom + start, length);
+        unsigned table = 0;
+        for (unsigned i = 0; i + 14 < length; i++) {
+            bool match = true;
+            for (unsigned j = 0; j < 7; j++)
+                match &= code[i + j * 2] == 0xCB && code[i + j * 2 + 1] == (direction ? 0x27 : 0x3F);
+            if (match) { table = i + 14; break; }
+        }
+        CHECK(table, "locate all seven glyph shift instructions");
+        for (unsigned shift = 0; shift < 8; shift++) {
+            /* Force the computed jump to end at xx00 for every shift count. */
+            unsigned target = 0x3C00 + shift * 2, relocated = target - table;
+            memcpy(rom + relocated, code, length);
+            unsigned patched = 0;
+            for (unsigned i = 0; i + 2 < length; i++) {
+                if (code[i] == 0x21 && (unsigned)(code[i + 1] | code[i + 2] << 8) == start + table) {
+                    rom[relocated + i + 1] = target;
+                    rom[relocated + i + 2] = target >> 8;
+                    patched++;
+                }
+            }
+            CHECK(patched == 1, "relocate the glyph jump-table address");
+            rom[0x3D00] = 0x18; rom[0x3D01] = 0xFE;
+            GB_write_memory(gb, 0xFFFF, 1);
+            GB_write_memory(gb, 0xFF0F, 1);
+            GB_run(gb);
+            GB_write_memory(gb, 0xFFFF, 0);
+            GB_write_memory(gb, 0x2000, 2);
+            GB_write_memory(gb, 0xFF90, 2);
+            GB_write_memory(gb, symbol("_vwf_current_rotate"), shift);
+            for (unsigned y = 0; y < 8; y++) {
+                GB_write_memory(gb, 0xC500 + y, 0x3C);
+                GB_write_memory(gb, 0xC600 + y, 0xA5 + y);
+            }
+            GB_write_memory(gb, 0xDF00, 0); GB_write_memory(gb, 0xDF01, 0x3D);
+            GB_write_memory(gb, 0xDF02, 5);
+            GB_registers_t *registers = GB_get_registers(gb);
+            registers->pc = relocated; registers->sp = 0xDF00;
+            registers->bc = 0xC600; registers->de = 0xC500;
+            frames(gb, 1);
+            if (registers->pc != 0x3D00 || registers->sp != 0xDF03)
+                fprintf(stderr, "shifter=%u shift=%u PC=%04x SP=%04x\n", direction, shift, registers->pc, registers->sp);
+            CHECK(registers->pc == 0x3D00 && registers->sp == 0xDF03,
+                  "glyph shifter returns normally across a page boundary");
+            CHECK(GB_read_memory(gb, 0xFF90) == 2, "glyph shifter restores its caller's ROM bank");
+            for (unsigned y = 0; y < 8; y++) {
+                uint8_t expected = (direction ? (0xA5 + y) << shift : (0xA5 + y) >> shift) ^ 0x3C;
+                CHECK(GB_read_memory(gb, 0xC500 + y) == expected, "glyph shift preserves all eight rows");
+            }
+        }
+    }
+    fprintf(stderr, "PASS: both glyph shifters return correct pixels at every page-boundary offset\n");
+}
+
 static void ui_test(GB_gameboy_t *gb)
 {
     screenshot("build/tests/ui-title.png");
@@ -474,6 +611,17 @@ static void ui_test(GB_gameboy_t *gb)
     press(gb, GB_KEY_B);
     unsigned previews = requests[0];
     frames(gb, 120);
+    if (requests[0] == previews) {
+        uint16_t rom_bank;
+        GB_get_direct_access(gb, GB_DIRECT_ACCESS_ROM, NULL, &rom_bank);
+        screenshot("build/tests/ui-stalled.png");
+        fprintf(stderr, "preview stalled PC=%04x LCDC=%02x STAT=%02x HDMA=%02x camera=%02x\n",
+                GB_get_registers(gb)->pc, GB_read_memory(gb, 0xFF40), GB_read_memory(gb, 0xFF41),
+                GB_read_memory(gb, 0xFF55), sensor[0]);
+        fprintf(stderr, "depth=%u faded=%u speed=%02x state=%u bank=%u sp=%04x\n",
+                GB_read_memory(gb, symbol("_color_ui_depth")), GB_read_memory(gb, symbol("_palette_faded")),
+                GB_read_memory(gb, 0xFF4D), GB_read_memory(gb, symbol("_CURRENT_PROGRAM_STATE")), rom_bank, GB_get_registers(gb)->sp);
+    }
     CHECK(requests[0] > previews, "preview resumes after UI transitions");
     fprintf(stderr, "PASS: exact title and hub pixels, title restoration, About, camera and popup transitions\n");
 }
@@ -486,7 +634,7 @@ int main(int argc, char **argv)
           !strcmp(scenario, "cancel") || !strcmp(scenario, "no-space") || !strcmp(scenario, "bad-version") ||
           !strcmp(scenario, "compat") || !strcmp(scenario, "gray") || !strcmp(scenario, "fresh") ||
           !strcmp(scenario, "fresh-zero") || !strcmp(scenario, "fresh-color") || !strcmp(scenario, "fresh-sensor") || !strcmp(scenario, "stress") ||
-          !strcmp(scenario, "cancel-red") || !strcmp(scenario, "cancel-blue") || !strcmp(scenario, "ui") ||
+          !strcmp(scenario, "cancel-red") || !strcmp(scenario, "cancel-blue") || !strcmp(scenario, "ui") || !strcmp(scenario, "transitions") || !strcmp(scenario, "font-boundary") ||
           !strcmp(scenario, "shuffled") || !strcmp(scenario, "incomplete") || !strcmp(scenario, "duplicate") || !strcmp(scenario, "neutral"), "known scenario");
     if (!strcmp(scenario, "cancel-red")) cancel_channel = 1;
     if (!strcmp(scenario, "cancel-blue")) cancel_channel = 3;
@@ -528,15 +676,30 @@ int main(int argc, char **argv)
     message_address = symbol("_MessageBox");
     GB_set_read_memory_callback(gb, memory_read);
     frames(gb, 600);
+    if (!strcmp(scenario, "font-boundary")) {
+        font_boundary_test(gb);
+        GB_free(gb); GB_dealloc(gb);
+        return 0;
+    }
     if (!strncmp(scenario, "fresh", 5)) {
         screenshot("build/tests/fresh-boot.png");
         CHECK(photo_count() == 0, "fresh SRAM starts with an empty camera roll");
         CHECK(!GB_read_memory(gb, symbol("_protected_status")), "fresh SRAM is initialized without reporting corruption");
         CHECK(GB_read_memory(gb, symbol("_color_enabled")), "Color defaults to On for new settings");
+        unsigned options = symbol("_camera_state");
+        CHECK((GB_read_memory(gb, options + 4) & 0x51) == 0x51,
+              "fresh settings enable fast printing, IR shutter, and double speed");
+        CHECK(GB_read_memory(gb, options + 7) & 0x20, "fresh settings enable CGB DMA");
+        CHECK(GB_read_memory(gb, 0xFF4D) & 0x80, "fresh settings apply double speed at boot");
     }
     if (model != GB_MODEL_DMG_B && strcmp(scenario, "compat") && strcmp(scenario, "fresh-color") && strcmp(scenario, "ui")) GB_write_memory(gb, symbol("_color_enabled"), 0);
     if (model == GB_MODEL_AGB_A) CHECK(GB_read_memory(gb, symbol("__is_ADVANCE")), "ROM detects Advance entry registers on AGB model");
     if (GB_read_memory(gb, symbol("_OLD_PROGRAM_STATE")) >= 5) press(gb, GB_KEY_START);
+    if (!strcmp(scenario, "transitions")) {
+        transitions_test(gb);
+        GB_free(gb); GB_dealloc(gb);
+        return 0;
+    }
     if (!strcmp(scenario, "ui")) {
         ui_test(gb);
         GB_free(gb); GB_dealloc(gb);

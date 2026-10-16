@@ -26,6 +26,7 @@
 #include "state_thumbnails.h"
 #include "state_gallery.h"
 #include "hicolor.h"
+#include "color_ui.h"
 #include "color_photo.h"
 
 #include "misc_assets.h"
@@ -165,6 +166,7 @@ inline uint8_t coords_to_picture_no(uint8_t x, uint8_t y) {
 }
 
 void tumbnail_refresh(uint8_t index) {
+    color_ui_begin();
     hicolor_stop();
 #if defined(COLOR_PHOTOS)
     hicolor_begin(0x80 + thumbnails_page_no);
@@ -190,9 +192,11 @@ void tumbnail_refresh(uint8_t index) {
 #if defined(COLOR_PHOTOS)
     hicolor_start();
 #endif
+    color_ui_end();
 }
 
 void thumbnails_diaplay(uint8_t start) {
+    color_ui_begin();
     hicolor_stop();
 #if defined(COLOR_PHOTOS)
     hicolor_begin(0x80 + thumbnails_page_no);
@@ -217,9 +221,12 @@ void thumbnails_diaplay(uint8_t start) {
 #if defined(COLOR_PHOTOS)
     hicolor_start();
 #endif
+    color_ui_end();
 }
 
 static void refresh_screen(void) {
+    color_ui_begin();
+    color_ui_clear();
     screen_clear_rect(0, 0, 20, 18, WHITE_ON_BLACK);
     menu_text_out(0, 0, 20, WHITE_ON_BLACK, ITEM_DEFAULT, " Thumbnail view");
 
@@ -232,6 +239,7 @@ static void refresh_screen(void) {
     menu_text_out(0, 17, HELP_CONTEXT_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " " ICON_A " select " ICON_START " for menu");
 #endif
     menu_text_out(HELP_CONTEXT_WIDTH, 17, IMAGE_SLOTS_USED_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, text_buffer);
+    color_ui_end();
 }
 
 uint8_t INIT_state_thumbnails(void) BANKED {
@@ -305,7 +313,6 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
             tumbnail_refresh(idx);
         } else PLAY_SFX(sound_error);
     } else if ((KEY_PRESSED(J_POPUP_MENU)) && (selected_image_count = selected_count())) {
-        hicolor_stop();
         switch (menu_result = menu_execute(&ThumbnailMenu, NULL, NULL)) {
             case ACTION_DELETE_SELECTED:
                 for (int8_t i = CAMERA_MAX_IMAGE_SLOTS - 1; i >= 0; i--) {
@@ -361,7 +368,6 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
     }
 #if defined(NINTENDO)
     else if (KEY_PRESSED(J_MAIN_MENU)) {
-        hicolor_stop();
         // run Main Menu
         hide_sprites_range(0, MAX_HARDWARE_SPRITES);
         if (!menu_main_execute()) refresh_screen();
@@ -373,9 +379,11 @@ uint8_t UPDATE_state_thumbnails(void) BANKED {
 }
 
 uint8_t LEAVE_state_thumbnails(void) BANKED {
+    color_ui_begin();
     hicolor_stop();
     hicolor_invalidate();
     fade_out_modal();
     hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+    color_ui_end();
     return 0;
 }

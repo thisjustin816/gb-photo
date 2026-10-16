@@ -17,6 +17,7 @@
 #include "joy.h"
 #include "systemhelpers.h"
 #include "ir.h"
+#include "color_ui.h"
 
 #include "state_camera.h"
 
@@ -372,6 +373,10 @@ uint8_t onHelpSettings(const struct menu_t * menu, const struct menu_item_t * se
 }
 uint8_t onShowSettings(const menu_t * self, uint8_t * param) {
     self; param;
+    if (settings_menu_repaint) {
+        color_ui_clear();
+        screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
+    }
     return (settings_menu_repaint) ? MENU_PROP_DEFAULT : MENU_PROP_SELECTION;
 }
 uint8_t onIdleSettings(const struct menu_t * menu, const struct menu_item_t * selection) {

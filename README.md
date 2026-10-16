@@ -2,7 +2,7 @@
 
 RGB color photography for Game Boy Camera, based on [Photo! by untoxa and contributors](https://github.com/untoxa/gb-photo).
 
-**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. Choose the ZIP to extract `Photo! DX [v1.13-dx.2].gbc` for version 1.13-dx.2. A direct ROM download is also available; GitHub removes spaces and brackets from its stored filename. Both contain the same Game Boy Color/Game Boy Advance ROM. No save file is bundled: a new installation creates an empty camera roll. To keep an existing emulator save, rename it to match the ROM basename using your emulator's save extension.
+**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. Choose the ZIP to extract `Photo! DX [v1.13-dx.3].gbc` for version 1.13-dx.3. A direct ROM download is also available; GitHub removes spaces and brackets from its stored filename. Both contain the same Game Boy Color/Game Boy Advance ROM. No save file is bundled: a new installation creates an empty camera roll. To keep an existing emulator save, rename it to match the ROM basename using your emulator's save extension.
 
 **[Development builds](https://github.com/thisjustin816/gb-photo/actions/workflows/build_and_package_rom.yml)** are available as the `photo-dx` artifact after running **Build and Release Photo! DX** manually. GitHub requires sign-in to download Actions artifacts, which are retained for 90 days.
 
@@ -43,6 +43,8 @@ The Game Gear build of Photo! can be used when flashable Game Boy Cameras are co
 # User Manual in brief
 
 The `.gbc` ROM runs on Game Boy Color and Game Boy Advance, supports Double Speed Mode and additional palettes, and adds RGB color photography. Original Game Boy, Pocket, and Super Game Boy are unsupported.
+
+New settings enable Color, double speed, DMA transfers, fast printing, and the IR shutter. Existing saved preferences are preserved; enable these options in Settings when upgrading an existing save. Fast printing requires a compatible printer or printer emulator; turn it off for the original Game Boy Printer. The IR shutter requires the Game Boy Color's IR port.
 
 ## Main hub
 
@@ -270,7 +272,7 @@ Each channel keeps the stock image, thumbnail, owner data, metadata checksums an
 
 The marker ends at `0xAFF1` / `0xBFF1`. The following bytes remain available for Photo!'s existing calibration records, including bank 2 at `0xAFF2` and bank 8 at `0xBFF2`. A group is recognized only when the used-slot index contains exactly one valid marker for each channel with the same ID. Slot order does not matter. Incomplete or duplicate-channel groups appear as independent grayscale photos. New IDs also avoid markers in deleted slots. Saving an ordinary photo clears the overwritten slot's marker.
 
-The Color preference occupies bank 0 at `0xA0E0` through `0xA0E5`: `RGBS`, an enabled byte (0 or 1), and its bitwise complement. Missing or invalid data means Off. The existing packed settings format is unchanged.
+The Color preference occupies bank 0 at `0xA0E0` through `0xA0E5`: `RGBS`, an enabled byte (0 or 1), and its bitwise complement. Missing or invalid data means On. The existing packed settings format is unchanged.
 
 ## Color verification
 

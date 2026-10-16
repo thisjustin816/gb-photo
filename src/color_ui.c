@@ -9,9 +9,28 @@
 #include "buffers.h"
 #include "color_photo.h"
 #include "color_ui.h"
+#include "hicolor.h"
 #include "palette.h"
 #include "screen.h"
 #include "color_ui_data.h"
+
+uint8_t color_ui_depth;
+
+void color_ui_begin(void) BANKED {
+    static const palette_color_t black[32] = {0};
+    if (color_ui_depth++) return;
+    sync_vblank();
+    hicolor_stop();
+    set_bkg_palette(0, 8, (const palette_color_t *)black);
+    set_sprite_palette(0, 8, (const palette_color_t *)black);
+}
+
+void color_ui_end(void) BANKED {
+    if (--color_ui_depth) return;
+    sync_vblank();
+    palette_apply();
+    if (hicolor_pending) hicolor_start();
+}
 
 void color_ui_clear(void) BANKED {
     hide_sprites_range(4, 40);
@@ -65,7 +84,7 @@ void color_ui_camera(void) BANKED {
     };
     if (!color_enabled) return;
     memcpy(&BkgPalette[5], colors, sizeof(colors));
-    set_bkg_palette(5, 1, colors);
+    palette_apply();
     screen_load_image(12, 0, 2, 1, badge);
     screen_restore_rect(12, 0, 2, 1);
     VBK_REG = 1;

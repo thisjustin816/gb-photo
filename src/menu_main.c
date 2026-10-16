@@ -171,10 +171,12 @@ uint8_t onShowMain(const menu_t * self, uint8_t * param) {
     color_ui_clear();
     screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
     menu_draw_frame(self);
+#if !defined(COLOR_PHOTOS)
     screen_load_image_banked(self->x + ((self->width - (logo_about_WIDTH / logo_about_TILE_W)) >> 1), self->y, logo_about_WIDTH / logo_about_TILE_W, logo_about_HEIGHT / logo_about_TILE_H, logo_about_tiles, BANK(logo_about));
     screen_restore_rect(self->x + ((self->width - (logo_about_WIDTH / logo_about_TILE_W)) >> 1), self->y, logo_about_WIDTH / logo_about_TILE_W, logo_about_HEIGHT / logo_about_TILE_H);
     screen_load_image_banked(self->x, self->y + 2, main_menu_WIDTH / main_menu_TILE_W, main_menu_HEIGHT / main_menu_TILE_H, main_menu_tiles, BANK(main_menu));
     screen_restore_rect(self->x, self->y + 2, main_menu_WIDTH / main_menu_TILE_W, main_menu_HEIGHT / main_menu_TILE_H);
+#endif
     color_ui_hub();
     return (MENU_PROP_SHADOW | MENU_PROP_SELECTION);
 }
@@ -191,7 +193,6 @@ uint8_t menu_main_execute(void) BANKED {
     do {
         menu_result = menu_execute(&MainMenu, NULL, last_menu_item);
         hide_sprites_range(0, MAX_HARDWARE_SPRITES);
-        color_ui_clear();
         switch (menu_result) {
             case ACTION_CAMERA:
                 PLAY_SFX(sound_ok);

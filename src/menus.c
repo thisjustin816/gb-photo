@@ -12,6 +12,7 @@
 #include "misc_assets.h"
 
 #include "menus.h"
+#include "color_ui.h"
 
 #include "sound_menu_move.h"
 
@@ -87,6 +88,8 @@ void menu_draw_shadow(const menu_t * menu) {
 
 uint8_t menu_redraw(const menu_t * menu, uint8_t * param, const menu_item_t * selection) {
     uint8_t result;
+    color_ui_begin();
+    hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 
     // call onShow handler if present
     result = (menu->onShow) ? menu->onShow(menu, param) : MENU_PROP_DEFAULT;
@@ -107,13 +110,12 @@ uint8_t menu_redraw(const menu_t * menu, uint8_t * param, const menu_item_t * se
         }
     }
 
+    color_ui_end();
     return result;
 }
 
 uint8_t menu_execute(const menu_t * menu, uint8_t * param, const menu_item_t * select) {
     const menu_item_t * selection, * new_selection;
-
-    hide_sprites_range(0, MAX_HARDWARE_SPRITES);
 
     // initialize selection
     selection = (select) ? select : (menu->items);

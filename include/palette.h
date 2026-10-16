@@ -3,6 +3,7 @@
 
 #include <gbdk/platform.h>
 #include <stdint.h>
+#include <stdbool.h>
 
 #include "compat.h"
 
@@ -40,8 +41,15 @@ typedef struct palette_entry_t {
 extern uint8_t DMG_palette[3];
 extern palette_entry_t SprPalette[N_PALETTES];
 extern palette_entry_t BkgPalette[N_PALETTES];
+#if defined(COLOR_PHOTOS)
+extern bool palette_faded;
+extern uint8_t color_ui_depth;
+#endif
 
 inline void palette_apply(void) {
+#if defined(COLOR_PHOTOS)
+    if (palette_faded || color_ui_depth) return;
+#endif
 #if defined(NINTENDO)
     set_bkg_palette(0, 8, (palette_color_t *)(&BkgPalette));
     set_sprite_palette(0, 8, (palette_color_t *)(&SprPalette));

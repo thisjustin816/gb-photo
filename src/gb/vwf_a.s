@@ -94,6 +94,7 @@ _vwf_print_shift_char_right::
         cpl
         inc a
         ld l, a
+        jr z, 12$
         jr c, 12$
         dec h
 12$:
@@ -144,6 +145,7 @@ _vwf_print_shift_char_left::
         cpl
         inc a
         ld l, a
+        jr z, 12$
         jr c, 12$
         dec h
 12$:

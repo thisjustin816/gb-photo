@@ -54,6 +54,7 @@ static void screen_load_picture(uint8_t x, uint8_t y, uint8_t w, uint8_t h, cons
 #endif
 
 static void refresh_screen(void) {
+    color_ui_begin();
     sync_vblank();
     color_ui_clear();
     vwf_set_colors(DMG_WHITE, DMG_BLACK);
@@ -67,6 +68,7 @@ static void refresh_screen(void) {
     screen_text_render(0, 17, version_string);
     sync_vblank();
     screen_restore_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT);
+    color_ui_end();
 }
 
 uint8_t INIT_state_logo(void) BANKED {
@@ -100,6 +102,5 @@ uint8_t UPDATE_state_logo(void) BANKED {
 
 uint8_t LEAVE_state_logo(void) BANKED {
     fade_out_modal();
-    color_ui_clear();
     return 0;
 }

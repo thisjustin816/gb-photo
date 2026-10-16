@@ -12,7 +12,7 @@ SAVE ?= assets/photo.sav
 CGB_BOOT ?=
 LEGACY_ROM ?=
 LEGACY_SYMBOLS ?=
-SCENARIOS := ui fresh fresh-zero fresh-color fresh-sensor normal color filters bad-version cancel-red cancel cancel-blue no-space shuffled incomplete duplicate neutral stress
+SCENARIOS := font-boundary transitions ui fresh fresh-zero fresh-color fresh-sensor normal color filters bad-version cancel-red cancel cancel-blue no-space shuffled incomplete duplicate neutral stress
 
 .PHONY: all test
 all: $(HARNESS)
@@ -44,3 +44,4 @@ test: $(HARNESS)
 	$(HARNESS) "$(LEGACY_ROM)" "$(LEGACY_SYMBOLS)" build/tests/color.sav "$(CGB_BOOT)" compat
 	$(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" fresh agb
 	$(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" ui agb
+	$(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" transitions agb

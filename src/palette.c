@@ -14,6 +14,9 @@ BANKREF(module_palette)
 uint8_t DMG_palette[3];
 palette_entry_t SprPalette[N_PALETTES];
 palette_entry_t BkgPalette[N_PALETTES];
+#if defined(COLOR_PHOTOS)
+bool palette_faded = true;
+#endif
 
 static palette_entry_t cgb_palette[] = {
     COLOR_PALETTE(RGB_WHITE,         RGB_LIGHTGRAY,     RGB_DARKGRAY,      RGB_BLACK       ),  // Arctic

@@ -24,6 +24,7 @@
 #include "state_camera.h"
 #include "state_gallery.h"
 #include "hicolor.h"
+#include "color_ui.h"
 
 #include "misc_assets.h"
 
@@ -105,7 +106,7 @@ void gallery_delete_picture(uint8_t image_no) BANKED {
     hicolor_invalidate();
 }
 
-uint8_t gallery_show_picture(uint8_t image_no) {
+static uint8_t draw_picture(uint8_t image_no) {
     hicolor_stop();
     sync_vblank();
     screen_clear_rect(IMAGE_DISPLAY_X, IMAGE_DISPLAY_Y, CAMERA_IMAGE_TILE_WIDTH, CAMERA_IMAGE_TILE_HEIGHT, WHITE_ON_BLACK);
@@ -132,6 +133,13 @@ uint8_t gallery_show_picture(uint8_t image_no) {
     screen_restore_rect(IMAGE_DISPLAY_X, IMAGE_DISPLAY_Y, CAMERA_IMAGE_TILE_WIDTH, CAMERA_IMAGE_TILE_HEIGHT);
 
     return displayed_index;
+}
+
+uint8_t gallery_show_picture(uint8_t image_no) {
+    color_ui_begin();
+    uint8_t result = draw_picture(image_no);
+    color_ui_end();
+    return result;
 }
 
 uint8_t gallery_show_position(uint8_t image_no) {
@@ -413,14 +421,18 @@ uint8_t gallery_print_info(void) {
 }
 
 static uint8_t refresh_screen(void) {
+    color_ui_begin();
     hicolor_stop();
+    color_ui_clear();
 #if defined(COLOR_PHOTOS)
     color_gallery_refresh();
 #endif
     screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
     menu_text_out(0, 0, DEVICE_SCREEN_WIDTH, WHITE_ON_BLACK, ITEM_DEFAULT, " Camera roll");
     show_gallery_help();
-    return gallery_show_position(gallery_show_picture(OPTION(gallery_picture_idx)));
+    uint8_t result = gallery_show_position(gallery_show_picture(OPTION(gallery_picture_idx)));
+    color_ui_end();
+    return result;
 }
 
 uint8_t INIT_state_gallery(void) BANKED {
@@ -470,7 +482,6 @@ uint8_t UPDATE_state_gallery(void) BANKED {
             return FALSE;
         }
     } else if (KEY_PRESSED(J_POPUP_MENU)) {
-        hicolor_stop();
         switch (menu_result = menu_execute(&GalleryMenu, NULL, NULL)) {
             case ACTION_ERASE_GALLERY:
                 hicolor_invalidate();
@@ -549,7 +560,6 @@ uint8_t UPDATE_state_gallery(void) BANKED {
         }
         OPTION(gallery_picture_idx) = refresh_screen();
     } else if (KEY_PRESSED(J_MAIN_MENU) || KEY_PRESSED(J_B)) {
-        hicolor_stop();
         // run Main Menu
         if (!menu_main_execute()) refresh_screen();
     }
@@ -557,9 +567,11 @@ uint8_t UPDATE_state_gallery(void) BANKED {
 }
 
 uint8_t LEAVE_state_gallery(void) BANKED {
+    color_ui_begin();
     hicolor_stop();
     hicolor_invalidate();
     fade_out_modal();
+    color_ui_end();
     gbprinter_set_handler(NULL, 0);
     return 0;
 }
