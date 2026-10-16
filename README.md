@@ -2,7 +2,7 @@
 
 RGB color photography for Game Boy Camera, based on [Photo! by untoxa and contributors](https://github.com/untoxa/gb-photo).
 
-**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. Releases contain one ROM, named `Photo! DX [v1.13-dx.2].gbc` for version 1.13-dx.2. It runs on Game Boy Color and Game Boy Advance. No save file is bundled: a new installation creates an empty camera roll. To keep an existing emulator save, rename it to match the ROM basename using your emulator's save extension.
+**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. Choose the ZIP to extract `Photo! DX [v1.13-dx.2].gbc` for version 1.13-dx.2. A direct ROM download is also available; GitHub removes spaces and brackets from its stored filename. Both contain the same Game Boy Color/Game Boy Advance ROM. No save file is bundled: a new installation creates an empty camera roll. To keep an existing emulator save, rename it to match the ROM basename using your emulator's save extension.
 
 **[Development builds](https://github.com/thisjustin816/gb-photo/actions/workflows/build_and_package_rom.yml)** are available as the `photo-dx` artifact after running **Build and Release Photo! DX** manually. GitHub requires sign-in to download Actions artifacts, which are retained for 90 days.
 
@@ -221,7 +221,7 @@ The ROM is written to `build/gbc/photo.gbc`.
 
 ## Publishing Photo! DX
 
-The workflow builds `make gbc` and checks that the ROM fits the 128 KiB flash layout. A manual workflow run produces a development download. Pushing a tag beginning with `v` builds and publishes a GitHub Release titled **Photo! DX TAG**, with `Photo! DX [TAG].gbc` attached. Tags containing a hyphen are marked as prereleases. The tag must equal `v` followed by the `version` file's value, which is also displayed inside the ROM.
+The workflow builds `make gbc` and checks that the ROM fits the 128 KiB flash layout. A manual workflow run produces a development download. Pushing a tag beginning with `v` builds and publishes a GitHub Release titled **Photo! DX TAG**, with a direct ROM and a ZIP containing `Photo! DX [TAG].gbc`. Tags containing a hyphen are marked as prereleases. The tag must equal `v` followed by the `version` file's value, which is also displayed inside the ROM.
 
 After committing and pushing the reviewed changes, a prerelease can be published with:
 
