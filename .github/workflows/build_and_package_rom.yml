@@ -86,8 +86,9 @@ jobs:
           GH_REPO: ${{ github.repository }}
           RELEASE_TAG: ${{ github.ref_name }}
         run: |
-          # gh expands file globs again, so protect the filename's literal brackets.
-          asset=$(python -c 'import glob, sys; print(glob.escape(sys.argv[1]))' release/*.gbc)
+          # GitHub normalizes direct asset names; the ZIP keeps the ROM's exact filename.
+          asset="release/Photo.DX.${RELEASE_TAG}.gbc"
+          cp release/*.gbc "$asset"
           args=("$RELEASE_TAG" "$asset#Photo! DX [$RELEASE_TAG].gbc" release/*.zip
             --verify-tag --title "Photo! DX $RELEASE_TAG" --generate-notes)
           if [[ "$RELEASE_TAG" == *-* ]]; then
