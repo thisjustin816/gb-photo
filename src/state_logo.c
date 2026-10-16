@@ -13,6 +13,7 @@
 #include "fade.h"
 #include "gbcamera.h"
 #include "state_camera.h"
+#include "color_ui.h"
 
 #include "misc_assets.h"
 
@@ -26,15 +27,18 @@
 #include "menu_main.h"
 
 // logo
+#if !defined(COLOR_PHOTOS)
 #include "logo.h"
+#endif
 
 BANKREF(state_logo)
 
 #define Q(x) #x
 #define QUOTE(x) Q(x)
 
-static const uint8_t version_string[] = " Version " QUOTE(VERSION) " (" QUOTE(BRANCH) ")";
+static const uint8_t version_string[] = " v" QUOTE(VERSION);
 
+#if !defined(COLOR_PHOTOS)
 static void screen_load_picture(uint8_t x, uint8_t y, uint8_t w, uint8_t h, const uint8_t * map, const uint8_t * tiles, uint8_t bank) {
     static uint8_t **addr, i, j;
     static const uint8_t *data;
@@ -47,12 +51,18 @@ static void screen_load_picture(uint8_t x, uint8_t y, uint8_t w, uint8_t h, cons
         }
     }
 }
+#endif
 
 static void refresh_screen(void) {
     sync_vblank();
+    color_ui_clear();
     vwf_set_colors(DMG_WHITE, DMG_BLACK);
     screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
+#if defined(COLOR_PHOTOS)
+    color_ui_title();
+#else
     screen_load_picture(0, 0, logo_WIDTH / logo_TILE_W, logo_HEIGHT / logo_TILE_H, logo_map, logo_tiles, BANK(logo));
+#endif
     screen_text_render(0, 16, " (c) 2022..2025, Toxa");
     screen_text_render(0, 17, version_string);
     sync_vblank();
@@ -90,5 +100,6 @@ uint8_t UPDATE_state_logo(void) BANKED {
 
 uint8_t LEAVE_state_logo(void) BANKED {
     fade_out_modal();
+    color_ui_clear();
     return 0;
 }

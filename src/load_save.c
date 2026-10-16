@@ -95,6 +95,17 @@ void save_camera_state(void) BANKED {
 }
 
 bool camera_settings_reset = false;
+bool camera_save_new = false;
+
+static bool save_is_blank(void) {
+    for (uint8_t bank = 0; bank != 16; bank++) {
+        CAMERA_SWITCH_RAM(bank);
+        for (const uint8_t *p = (const uint8_t *)0xA000; p != (const uint8_t *)0xC000; p++) {
+            if (*p != 0 && *p != 0xFF) return false;
+        }
+    }
+    return true;
+}
 
 // enable battery backed-up SRAM and load/initialize program settings
 uint8_t INIT_module_load_save(void) BANKED {
@@ -102,6 +113,8 @@ uint8_t INIT_module_load_save(void) BANKED {
     CAMERA_SWITCH_RAM(LOAD_SAVE_DATA_BANK);
     // check for the valid save blob and initialize with defaults if fail
     if (save_structure.MAGIC != MAGIC_VALUE) {
+        camera_save_new = save_is_blank();
+        CAMERA_SWITCH_RAM(LOAD_SAVE_DATA_BANK);
         save_structure.MAGIC = MAGIC_VALUE;
         save_structure.state_options = default_camera_state_options;
         memcpy(save_structure.mode_settings, default_camera_mode_settings, sizeof(save_structure.mode_settings));

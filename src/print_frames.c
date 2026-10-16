@@ -57,8 +57,8 @@ const frame_desc_t print_frames[] = {
         .thumb_bank = BANK(frame_photo_thumb),
         .image_y = 2,
         .image_x = 2,
-        .caption = "Photo!",
-        .desc = "\"Photo!\" frame"
+        .caption = "Photo! DX",
+        .desc = "Photo! DX frame"
     }, {
         .height = IMG_HEIGHT(frame_lens),
         .map = frame_lens_map,

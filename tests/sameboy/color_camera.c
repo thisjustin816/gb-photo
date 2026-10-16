@@ -333,7 +333,7 @@ static void color_photos(void)
         CHECK(!(channels & (1 << channel)), "exactly one image per channel");
         channels |= 1 << channel;
         uint16_t id = marker[5] | (marker[6] << 8);
-        CHECK(id > 1 && (!group || group == id), "shared group ID avoids a marker in a deleted slot");
+        CHECK(id >= (!strcmp(scenario, "fresh-color") ? 1u : 2u) && (!group || group == id), "shared group ID avoids a marker in a deleted slot");
         group = id;
         for (unsigned bar = 0; bar < 8; bar++) {
             uint8_t level = (bar & (4 >> channel)) ? 0 : 3;
@@ -420,14 +420,71 @@ static void renderer_pixels(GB_gameboy_t *gb, const unsigned bases[3], bool neut
     }
 }
 
+static void ui_pixels(const char *name, unsigned x0, unsigned y0, unsigned width, unsigned height,
+                      unsigned crop_x, unsigned crop_y, unsigned crop_width, unsigned crop_height)
+{
+    char path[128];
+    snprintf(path, sizeof(path), "obj/gbc/%s-expected.rgb", name);
+    FILE *file = fopen(path, "rb");
+    CHECK(file, "open generated UI reference");
+    for (unsigned y = 0; y < height; y++) for (unsigned x = 0; x < width; x++) {
+        uint8_t expected[3];
+        CHECK(fread(expected, 1, 3, file) == 3, "read UI reference pixel");
+        if (x < crop_x || x >= crop_x + crop_width || y < crop_y || y >= crop_y + crop_height) continue;
+        uint32_t want = (expected[0] << 16) | (expected[1] << 8) | expected[2];
+        CHECK((pixels[(y0+y)*160+x0+x] & 0xFFFFFF) == want, "UI preserves every authored color pixel");
+    }
+    CHECK(fgetc(file) == EOF, "UI reference has exact dimensions");
+    fclose(file);
+}
+
+static void ui_test(GB_gameboy_t *gb)
+{
+    screenshot("build/tests/ui-title.png");
+    ui_pixels("title", 0, 0, 160, 128, 0, 0, 160, 128);
+    press(gb, GB_KEY_START);
+    screenshot("build/tests/ui-hub.png");
+    uint8_t lcdc = GB_read_memory(gb, 0xFF40);
+    GB_write_memory(gb, 0xFF40, lcdc & ~2);
+    frames(gb, 2);
+    ui_pixels("hub", 8, 24, 144, 48, 40, 0, 80, 16);
+    ui_pixels("hub", 8, 24, 144, 48, 0, 16, 144, 32);
+    GB_write_memory(gb, 0xFF40, lcdc);
+    for (unsigned i = 4; i < 40; i++) CHECK(!GB_read_memory(gb, 0xFE00+i*4), "title sprites hidden in hub");
+    press(gb, GB_KEY_B);
+    ui_pixels("title", 0, 0, 160, 128, 0, 0, 160, 128);
+    press(gb, GB_KEY_START);
+    for (unsigned i = 0; i < 4; i++) press(gb, GB_KEY_RIGHT);
+    press(gb, GB_KEY_A);
+    screenshot("build/tests/ui-about.png");
+    press(gb, GB_KEY_B);
+    press(gb, GB_KEY_B);
+    press(gb, GB_KEY_A);
+    frames(gb, 120);
+    CHECK(GB_read_memory(gb, symbol("_CURRENT_PROGRAM_STATE")) == 3, "camera entered after About");
+    size_t size;
+    uint8_t *vram = GB_get_direct_access(gb, GB_DIRECT_ACCESS_VRAM, &size, NULL);
+    for (unsigned y = 1; y < 15; y++) for (unsigned x = 2; x < 18; x++)
+        CHECK(vram[0x3800+y*32+x] == 0, "UI colors do not tint the live camera image");
+    screenshot("build/tests/ui-camera.png");
+    press(gb, GB_KEY_SELECT);
+    screenshot("build/tests/ui-popup.png");
+    press(gb, GB_KEY_B);
+    unsigned previews = requests[0];
+    frames(gb, 120);
+    CHECK(requests[0] > previews, "preview resumes after UI transitions");
+    fprintf(stderr, "PASS: exact title and hub pixels, title restoration, About, camera and popup transitions\n");
+}
+
 int main(int argc, char **argv)
 {
     CHECK(argc >= 5 && argc <= 7, "usage: color_camera ROM SYMBOLS SAVE BOOT_ROM [SCENARIO] [cgb|agb|dmg]; see tests/sameboy/README.md");
     if (argc >= 6) scenario = argv[5];
     CHECK(!strcmp(scenario, "normal") || !strcmp(scenario, "color") || !strcmp(scenario, "filters") ||
           !strcmp(scenario, "cancel") || !strcmp(scenario, "no-space") || !strcmp(scenario, "bad-version") ||
-          !strcmp(scenario, "compat") || !strcmp(scenario, "gray") || !strcmp(scenario, "stress") ||
-          !strcmp(scenario, "cancel-red") || !strcmp(scenario, "cancel-blue") ||
+          !strcmp(scenario, "compat") || !strcmp(scenario, "gray") || !strcmp(scenario, "fresh") ||
+          !strcmp(scenario, "fresh-zero") || !strcmp(scenario, "fresh-color") || !strcmp(scenario, "stress") ||
+          !strcmp(scenario, "cancel-red") || !strcmp(scenario, "cancel-blue") || !strcmp(scenario, "ui") ||
           !strcmp(scenario, "shuffled") || !strcmp(scenario, "incomplete") || !strcmp(scenario, "duplicate") || !strcmp(scenario, "neutral"), "known scenario");
     if (!strcmp(scenario, "cancel-red")) cancel_channel = 1;
     if (!strcmp(scenario, "cancel-blue")) cancel_channel = 3;
@@ -457,6 +514,7 @@ int main(int argc, char **argv)
     CHECK(sram && size >= 0x20000, "128 KiB camera SRAM");
     uint8_t original_sram[0x20000];
     if (!strcmp(scenario, "compat")) memcpy(original_sram, sram, sizeof(original_sram));
+    else if (!strncmp(scenario, "fresh", 5)) memset(sram, !strcmp(scenario, "fresh-zero") ? 0 : 0xFF, 0x20000);
     else empty_roll();
     uint8_t original_request[16];
     memcpy(original_request, sram + 0xF0, sizeof(original_request));
@@ -468,8 +526,20 @@ int main(int argc, char **argv)
     message_address = symbol("_MessageBox");
     GB_set_read_memory_callback(gb, memory_read);
     frames(gb, 600);
+    if (!strncmp(scenario, "fresh", 5)) {
+        screenshot("build/tests/fresh-boot.png");
+        CHECK(photo_count() == 0, "fresh SRAM starts with an empty camera roll");
+        CHECK(!GB_read_memory(gb, symbol("_protected_status")), "fresh SRAM is initialized without reporting corruption");
+        CHECK(GB_read_memory(gb, symbol("_color_enabled")), "Color defaults to On for new settings");
+    }
+    if (model != GB_MODEL_DMG_B && strcmp(scenario, "compat") && strcmp(scenario, "fresh-color") && strcmp(scenario, "ui")) GB_write_memory(gb, symbol("_color_enabled"), 0);
     if (model == GB_MODEL_AGB_A) CHECK(GB_read_memory(gb, symbol("__is_ADVANCE")), "ROM detects Advance entry registers on AGB model");
     if (GB_read_memory(gb, symbol("_OLD_PROGRAM_STATE")) >= 5) press(gb, GB_KEY_START);
+    if (!strcmp(scenario, "ui")) {
+        ui_test(gb);
+        GB_free(gb); GB_dealloc(gb);
+        return 0;
+    }
     if (!strcmp(scenario, "compat")) {
         press(gb, GB_KEY_START);
         press(gb, GB_KEY_RIGHT);
@@ -494,16 +564,18 @@ int main(int argc, char **argv)
     CHECK(requests[0] > 0, "ordinary brightness preview observed");
     CHECK(requests[1] + requests[2] + requests[3] == 0, "Color off does not request an RGB exposure");
     fprintf(stderr, "PASS: %u ordinary preview exposures%s\n", requests[0], !strcmp(scenario, "gray") ? " on GB" : " request channel 0");
-    if (strcmp(scenario, "normal") && strcmp(scenario, "gray")) {
-        press(gb, GB_KEY_SELECT);
-        for (unsigned i = 0; i < 4; i++) press(gb, GB_KEY_DOWN);
-        press(gb, GB_KEY_A);
-        press(gb, GB_KEY_DOWN);
-        press(gb, GB_KEY_A);
-        press(gb, GB_KEY_SELECT);
-        press(gb, GB_KEY_DOWN);
-        press(gb, GB_KEY_A);
-        CHECK(GB_read_memory(gb, symbol("_color_enabled")), "Color setting enabled through camera menu");
+    if (strcmp(scenario, "normal") && strcmp(scenario, "gray") && strcmp(scenario, "fresh") && strcmp(scenario, "fresh-zero")) {
+        if (strcmp(scenario, "fresh-color")) {
+            press(gb, GB_KEY_SELECT);
+            for (unsigned i = 0; i < 4; i++) press(gb, GB_KEY_DOWN);
+            press(gb, GB_KEY_A);
+            press(gb, GB_KEY_DOWN);
+            press(gb, GB_KEY_A);
+            press(gb, GB_KEY_SELECT);
+            press(gb, GB_KEY_DOWN);
+            press(gb, GB_KEY_A);
+            CHECK(GB_read_memory(gb, symbol("_color_enabled")), "Color setting enabled through camera menu");
+        }
         uint8_t *before = malloc(15 * 0x2000);
         CHECK(before, "allocate SRAM snapshot");
         memcpy(before, sram + 0x2000, 15 * 0x2000);
@@ -523,8 +595,22 @@ int main(int argc, char **argv)
         if (host_handshake) CHECK(requests[1] == 1 && requests[2] == 1 && requests[3] == 1, "red, green and blue requested once");
         else CHECK(prompt_mask == 7 && requests[1] == 2 && requests[2] == 1 && requests[3] == 1, "unacknowledged probe discarded before all three filter exposures");
         color_photos();
+        unsigned previews = requests[0];
+        frames(gb, 180);
+        CHECK(requests[0] > previews, "live preview resumes after color capture");
         fprintf(stderr, "PASS: RGB exposures, locked settings, stock photos, group markers and checksums\n");
         CHECK(GB_save_battery(gb, "build/tests/color.sav") == 0, "save color fixture");
+        if (!strcmp(scenario, "fresh-color")) {
+            GB_reset(gb);
+            CHECK(GB_load_battery(gb, "build/tests/color.sav") == 0, "reload color photo after power cycle");
+            frames(gb, 600);
+            CHECK(photo_count() == 3 && GB_read_memory(gb, symbol("_color_enabled")), "fresh color photo and default Color On survive power cycle");
+            CHECK(!GB_read_memory(gb, symbol("_protected_status")), "color save survives power cycle without repairs");
+            stock_checksums();
+            fprintf(stderr, "PASS: fresh Color-On capture, responsive preview, and color save power cycle\n");
+            GB_free(gb); GB_dealloc(gb);
+            return 0;
+        }
         bool renderer_test = !strcmp(scenario, "stress") || !strcmp(scenario, "neutral");
         if (renderer_test) renderer_fixture(!strcmp(scenario, "neutral"));
         unsigned bases[3];
@@ -645,6 +731,21 @@ int main(int argc, char **argv)
         stock_checksums();
         if (!strcmp(scenario, "gray")) CHECK(!memcmp(original_request, sram + 0xF0, sizeof(original_request)), "GB leaves the unused handshake area unchanged");
         fprintf(stderr, "PASS: ordinary photo and stock checksums\n");
+        unsigned previews = requests[0];
+        frames(gb, 180);
+        CHECK(requests[0] > previews, "live preview continues after saving an ordinary photo");
+        press(gb, GB_KEY_B);
+        press(gb, GB_KEY_RIGHT);
+        press(gb, GB_KEY_A);
+        CHECK(GB_read_memory(gb, symbol("_CURRENT_PROGRAM_STATE")) == 1, "camera responds after saving and opens the gallery");
+        screenshot("build/tests/ordinary-saved.png");
+        CHECK(GB_save_battery(gb, "build/tests/ordinary-saved.sav") == 0, "persist ordinary photo for a power cycle");
+        GB_reset(gb);
+        CHECK(GB_load_battery(gb, "build/tests/ordinary-saved.sav") == 0, "reload saved battery after power cycle");
+        frames(gb, 600);
+        CHECK(photo_count() == 1 && !GB_read_memory(gb, symbol("_protected_status")), "ordinary photo survives power cycle with valid checksums");
+        stock_checksums();
+        fprintf(stderr, "PASS: preview and menus respond after save; photo survives a power cycle\n");
     }
     GB_free(gb);
     GB_dealloc(gb);

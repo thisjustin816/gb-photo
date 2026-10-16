@@ -8,14 +8,11 @@ CORE_OPTIONS := DISABLE_REWIND=1 DISABLE_DEBUGGER=1 DISABLE_CHEATS=1 DISABLE_CHE
 CORE_DEFINES := -DGB_DISABLE_REWIND -DGB_DISABLE_DEBUGGER -DGB_DISABLE_CHEATS -DGB_DISABLE_CHEAT_SEARCH
 CGB_ROM ?= build/gbc/photo.gbc
 CGB_SYMBOLS ?= build/gbc/photo.noi
-GB_ROM ?= build/gb/photo.gb
-GB_SYMBOLS ?= build/gb/photo.noi
 SAVE ?= assets/photo.sav
 CGB_BOOT ?=
-DMG_BOOT ?=
 LEGACY_ROM ?=
 LEGACY_SYMBOLS ?=
-SCENARIOS := normal color filters bad-version cancel-red cancel cancel-blue no-space shuffled incomplete duplicate neutral stress
+SCENARIOS := ui fresh fresh-zero fresh-color normal color filters bad-version cancel-red cancel cancel-blue no-space shuffled incomplete duplicate neutral stress
 
 .PHONY: all test
 all: $(HARNESS)
@@ -34,8 +31,8 @@ $(HARNESS): tests/sameboy/color_camera.c $(CORE)
 	$(CC) -std=gnu11 -O2 -Wall -Wextra -Werror $(CORE_DEFINES) -I$(SAMEBOY_DIR) $< $(CORE) -lm -ldl -o $@
 
 test: $(HARNESS)
-	@test -f "$(CGB_BOOT)" -a -f "$(DMG_BOOT)" -a -f "$(LEGACY_ROM)" -a -f "$(LEGACY_SYMBOLS)" || \
-	    { echo 'Set CGB_BOOT, DMG_BOOT, LEGACY_ROM, and LEGACY_SYMBOLS to existing files.'; exit 1; }
+	@test -f "$(CGB_BOOT)" -a -f "$(LEGACY_ROM)" -a -f "$(LEGACY_SYMBOLS)" || \
+	    { echo 'Set CGB_BOOT, LEGACY_ROM, and LEGACY_SYMBOLS to existing files.'; exit 1; }
 	@set -e; for scenario in $(SCENARIOS); do \
 	    $(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" $$scenario > build/tests/$$scenario.log 2>&1 || \
 	        { cat build/tests/$$scenario.log; exit 1; }; \
@@ -45,4 +42,5 @@ test: $(HARNESS)
 	$(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" color agb
 	cp build/tests/hicolor.png build/tests/agb.png
 	$(HARNESS) "$(LEGACY_ROM)" "$(LEGACY_SYMBOLS)" build/tests/color.sav "$(CGB_BOOT)" compat
-	$(HARNESS) "$(GB_ROM)" "$(GB_SYMBOLS)" "$(SAVE)" "$(DMG_BOOT)" gray dmg
+	$(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" fresh agb
+	$(HARNESS) "$(CGB_ROM)" "$(CGB_SYMBOLS)" "$(SAVE)" "$(CGB_BOOT)" ui agb

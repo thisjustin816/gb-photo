@@ -253,6 +253,9 @@ static void fill_inc(uint8_t * array, uint8_t size) {
 static void fill_zero(uint8_t * array, uint8_t size) {
     memset(array, 0, size);
 }
+static void fill_deleted(uint8_t * array, uint8_t size) {
+    memset(array, CAMERA_IMAGE_DELETED, size);
+}
 
 bool check_and_try_repair(uint8_t * block, uint16_t size, fill_func_t * init) {
     static bool res;
@@ -278,7 +281,7 @@ bool check_and_try_repair(uint8_t * block, uint16_t size, fill_func_t * init) {
 uint8_t INIT_module_protected(void) BANKED {
     CAMERA_SWITCH_RAM(CAMERA_BANK_LAST_SEEN);
     if (check_and_try_repair(&prot_album,  ALBUM_LENGTH,  fill_zero)) protected_status |= PROTECTED_REPAIR_ALBUM;
-    if (check_and_try_repair(&prot_vector, VECTOR_LENGTH, fill_inc))  protected_status |= PROTECTED_REPAIR_VECTOR;
+    if (check_and_try_repair(&prot_vector, VECTOR_LENGTH, camera_save_new ? fill_deleted : fill_inc)) protected_status |= PROTECTED_REPAIR_VECTOR;
     CAMERA_SWITCH_RAM(CAMERA_BANK_OWNER_DATA);
     if (check_and_try_repair(&prot_owner,  OWNER_LENGTH,  fill_zero)) protected_status |= PROTECTED_REPAIR_OWNER;
     for (uint8_t i = 1; i != 16; i++) {
@@ -294,6 +297,7 @@ uint8_t INIT_module_protected(void) BANKED {
         protected_status |= PROTECTED_REPAIR_CAL;
     }
     CAMERA_SWITCH_RAM(CAMERA_BANK_LAST_SEEN);
+    if (camera_save_new) protected_status = PROTECTED_CORRECT;
     return 0;
 }
 
@@ -306,7 +310,7 @@ const uint8_t * const repair_messages[] = {
 };
 
 uint8_t INIT_module_sysmessages(void) BANKED {
-    if ((!camera_settings_reset) && (protected_status == PROTECTED_CORRECT)) return 0;
+    if (camera_save_new || ((!camera_settings_reset) && (protected_status == PROTECTED_CORRECT))) return 0;
 
     sync_vblank();
     vwf_set_colors(DMG_WHITE, DMG_BLACK);

@@ -12,6 +12,7 @@
 #include "globals.h"
 #include "systemhelpers.h"
 #include "joy.h"
+#include "color_ui.h"
 
 #include "misc_assets.h"
 
@@ -79,11 +80,14 @@ uint8_t onAboutMenuItemProps(const struct menu_t * menu, const struct menu_item_
 }
 uint8_t onShowAbout(const menu_t * self, uint8_t * param) {
     param;
+    color_ui_clear();
+    screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
     menu_draw_frame(self);
     screen_load_image_banked(self->x + ((self->width - (logo_about_WIDTH / logo_about_TILE_W)) >> 1), self->y, logo_about_WIDTH / logo_about_TILE_W, logo_about_HEIGHT / logo_about_TILE_H, logo_about_tiles, BANK(logo_about));
     screen_restore_rect(self->x + ((self->width - (logo_about_WIDTH / logo_about_TILE_W)) >> 1), self->y, logo_about_WIDTH / logo_about_TILE_W, logo_about_HEIGHT / logo_about_TILE_H);
     vwf_activate_font(1);
-    menu_text_out(self->x + 13, self->y     , 0, BLACK_ON_WHITE, ITEM_DEFAULT, "v." QUOTE(VERSION));
+    menu_text_out(self->x + 13, self->y, 0, BLACK_ON_WHITE, ITEM_DEFAULT, "DX");
+    menu_text_out(self->x + 1, self->y + 14, 0, BLACK_ON_WHITE, ITEM_DEFAULT, "v" QUOTE(VERSION));
     menu_text_out(self->x +  1, self->y +  2, 0, BLACK_ON_WHITE, ITEM_DEFAULT, "Original idea:");
     menu_text_out(self->x +  2, self->y +  3, 0, DK_GR_ON_WHITE, ITEM_DEFAULT, "Andreas Hahn");
     menu_text_out(self->x +  1, self->y +  4, 0, BLACK_ON_WHITE, ITEM_DEFAULT, "Development:");
@@ -136,7 +140,7 @@ const menu_item_t MainMenuItems[] = {
         .sub = &AboutMenu, .sub_params = NULL,
         .ofs_x = 2 + (28 * 4), .ofs_y = 16, .width = 0,
         .caption = NULL, //" About",
-        .helpcontext = " About \"Photo!\" v." QUOTE(VERSION),
+        .helpcontext = " About Photo! DX",
         .onPaint = NULL,
         .result = ACTION_ABOUT
     }
@@ -164,11 +168,14 @@ uint8_t onIdleMainMenu(const struct menu_t * menu, const struct menu_item_t * se
 }
 uint8_t onShowMain(const menu_t * self, uint8_t * param) {
     param; self;
+    color_ui_clear();
+    screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
     menu_draw_frame(self);
     screen_load_image_banked(self->x + ((self->width - (logo_about_WIDTH / logo_about_TILE_W)) >> 1), self->y, logo_about_WIDTH / logo_about_TILE_W, logo_about_HEIGHT / logo_about_TILE_H, logo_about_tiles, BANK(logo_about));
     screen_restore_rect(self->x + ((self->width - (logo_about_WIDTH / logo_about_TILE_W)) >> 1), self->y, logo_about_WIDTH / logo_about_TILE_W, logo_about_HEIGHT / logo_about_TILE_H);
     screen_load_image_banked(self->x, self->y + 2, main_menu_WIDTH / main_menu_TILE_W, main_menu_HEIGHT / main_menu_TILE_H, main_menu_tiles, BANK(main_menu));
     screen_restore_rect(self->x, self->y + 2, main_menu_WIDTH / main_menu_TILE_W, main_menu_HEIGHT / main_menu_TILE_H);
+    color_ui_hub();
     return (MENU_PROP_SHADOW | MENU_PROP_SELECTION);
 }
 uint8_t onHelpMainMenu(const struct menu_t * menu, const struct menu_item_t * selection) {
@@ -184,6 +191,7 @@ uint8_t menu_main_execute(void) BANKED {
     do {
         menu_result = menu_execute(&MainMenu, NULL, last_menu_item);
         hide_sprites_range(0, MAX_HARDWARE_SPRITES);
+        color_ui_clear();
         switch (menu_result) {
             case ACTION_CAMERA:
                 PLAY_SFX(sound_ok);

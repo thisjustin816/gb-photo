@@ -25,8 +25,9 @@ uint8_t color_gallery_slots[CAMERA_MAX_IMAGE_SLOTS], color_gallery_count;
 
 void color_settings_load(void) BANKED {
     CAMERA_SWITCH_RAM(0);
-    color_enabled = _is_COLOR && !memcmp(color_options, "RGBS", 4) &&
-                    color_options[4] == 1 && color_options[5] == 0xFE;
+    bool valid = !memcmp(color_options, "RGBS", 4) && color_options[4] <= 1 &&
+                 color_options[5] == (uint8_t)~color_options[4];
+    color_enabled = _is_COLOR && (!valid || color_options[4]);
 }
 
 void color_settings_save(void) BANKED {

@@ -23,6 +23,7 @@ void restore_default_mode_settings(camera_mode_e mode) BANKED;
 void save_camera_state(void) BANKED;
 
 extern bool camera_settings_reset;
+extern bool camera_save_new;
 
 uint8_t INIT_module_load_save(void) BANKED;
 

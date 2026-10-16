@@ -2,17 +2,15 @@
 
 RGB color photography for Game Boy Camera, based on [Photo! by untoxa and contributors](https://github.com/untoxa/gb-photo).
 
-**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. The `photo-dx.zip` package contains:
-
-- `Photo! DX (World).gb`: the grayscale Game Boy build.
-- `Photo! DX (World).gbc`: the color build for Game Boy Color and Game Boy Advance.
-- `Photo! DX (World).sav`: a starter save for a new installation. Existing emulator saves can be renamed to match the ROM basename.
+**[Download Photo! DX](https://github.com/thisjustin816/gb-photo/releases)** from this fork's releases. Releases contain one ROM, named `Photo! DX [v1.13-dx.2].gbc` for version 1.13-dx.2. It runs on Game Boy Color and Game Boy Advance. No save file is bundled: a new installation creates an empty camera roll. To keep an existing emulator save, rename it to match the ROM basename using your emulator's save extension.
 
 **[Development builds](https://github.com/thisjustin816/gb-photo/actions/workflows/build_and_package_rom.yml)** are available as the `photo-dx` artifact after running **Build and Release Photo! DX** manually. GitHub requires sign-in to download Actions artifacts, which are retained for 90 days.
 
-![Photo! upstream logo](doc/Images/PHOTO_HD_Logo.svg)
+![Photo! DX title](doc/Images/Photo_DX_Title.png)
 
-This project is a homebrew enhancing the capabilities of the Game Boy Camera by allowing access to all the possible parameters of the sensor and improving the printing speed and the camera ergonomics in general. This project is compatible with all known models of Game Boy printer and Game Boy printer emulator. The project features Game Boy And Game Boy Color versions.
+The color title follows the original artist's wordmark, including its lens and the Game Boy behind the P. The menu uses material colors for its icons, with RGB accents on the camera indicator. UI colors do not change the selected photo palette.
+
+This project gives access to the Game Boy Camera's sensor parameters and improves printing speed and camera controls. It supports Game Boy printers and printer emulators. Photo! DX targets Game Boy Color and Game Boy Advance only.
 
 Upstream Photo! also supports the [Mega Duck, also known as Cougar Boy](https://en.wikipedia.org/wiki/Mega_Duck). It requires a special adapter that you can build from informations [available here (soon)](https://github.com/bbbbbr/megaduck-info).
 
@@ -42,11 +40,11 @@ The Game Gear build of Photo! can be used when flashable Game Boy Cameras are co
 
 # User Manual in brief
 
-The GB ROM runs on the original Game Boy and Game Boy Pocket with grayscale output. The CGB ROM runs on Game Boy Color and Game Boy Advance, supports Double Speed Mode and additional palettes, and adds RGB color photography.
+The `.gbc` ROM runs on Game Boy Color and Game Boy Advance, supports Double Speed Mode and additional palettes, and adds RGB color photography. Original Game Boy, Pocket, and Super Game Boy are unsupported.
 
 ## Main hub
 
-![Main Hub](doc/Images/Main_Hub.png)
+![Main Hub](doc/Images/Photo_DX_Hub.png)
 
 The **main hub** brings you to the 5 main menus by pressing START after boot. You can skip it and going directly to **Camera Mode** by pressing A/B/SELECT.
 
@@ -58,7 +56,7 @@ The **main hub** brings you to the 5 main menus by pressing START after boot. Yo
 
 ## Camera Mode
 
-![Camera Mode](doc/Images/Camera_Mode.png)
+![Camera Mode](doc/Images/Photo_DX_Camera.png)
 
 The **camera mode** was created to propose many more features than a regular camera like infinite time-lapse, ultra-fast transmission, full manual mode, support of third party devices, etc. It was polished by people passionate by the Game Boy Camera.
 
@@ -100,7 +98,7 @@ The **Transfer** protocol is very similar to standard printing. Only two packets
 
 ### Color photos (Game Boy Color and Advance)
 
-The CGB ROM adds **Color**, below **Dithering** in the camera popup. It defaults to **Off**. With Color on, a shutter action saves one RGB group: red, green, then blue, using three of the 30 photo slots. Exposure, gain, edge processing, contrast, inversion and dithering stay fixed across the three exposures. Keep the scene and camera still.
+**Color**, below **Dithering** in the camera popup, defaults to **On** for new settings. A saved On or Off choice is preserved. With Color on, a shutter action saves one RGB group: red, green, then blue, using three of the 30 photo slots. Exposure, gain, edge processing, contrast, inversion and dithering stay fixed across the three exposures. Keep the scene and camera still.
 
 The live preview remains the usual four shades in the selected palette. It always requests ordinary brightness, including while Color is on. HiColor conversion runs when a saved color photo or its thumbnail is opened. A progress bar appears during conversion; the result stays cached while that photo or thumbnail page remains open. Menus and printing pause HiColor, and closing a menu restores the cached view.
 
@@ -108,7 +106,7 @@ An emulator implementing the [RGB camera handshake](#rgb-camera-handshake) suppl
 
 Color capture saves a single group and ends the current repeat or AEB sequence. Camera Print and Transfer actions do not run during this capture; use the gallery afterward. Video actions continue to use ordinary brightness captures.
 
-The CGB gallery and thumbnail view show a complete group once. Deleting it asks for confirmation and removes all three channels. Printing a group prints its green channel. Transferring a group sends three ordinary grayscale images in RGB order; it does not export a combined color image. The GB ROM and older Photo! releases show the three channels separately.
+The gallery and thumbnail view show a complete group once. Deleting it asks for confirmation and removes all three channels. Printing a group prints its green channel. Transferring a group sends three ordinary grayscale images in RGB order; it does not export a combined color image. Older upstream Photo! releases show the three channels separately.
 
 The renderer chooses four representative colors for each 32-pixel-wide, staggered pair of scanlines. Background palette 0 remains available for text and selection marks. This is an approximation of the 64 possible input colors. The selected display palette supplies each component's brightness curve, so equal RGB channels reproduce the same shades as an ordinary photo. Inversion is already present in the saved channel pixels.
 
@@ -211,28 +209,28 @@ Download and install `Git` built for Windows from [here](https://git-scm.com/dow
 
 Now from the Cygwin terminal, clone this git repository to its desired destination (default is `/home/USER`), but may be any:
 
-    git clone https://github.com/untoxa/gb-photo
+    git clone https://github.com/thisjustin816/gb-photo
 
 Set the `GBDK_HOME` environment variable which targets your GBDK-2020 folder. Best is to stay with the default GBDK_HOME = "C:/GBDK/"
 
 Run make from the Cygwin terminal in the project folder containing the `Makefile`:
 
-    make gb gbc
+    make gbc
 
-Your roms will be in `./build` folders, enjoy !
+The ROM is written to `build/gbc/photo.gbc`.
 
 ## Publishing Photo! DX
 
-The existing workflow builds `make gb gbc` and checks that both ROMs fit the 128 KiB flash layout. A manual workflow run produces a development download. Pushing a tag beginning with `v` builds and publishes a GitHub Release titled **Photo! DX TAG**, with `photo-dx.zip` attached. Tags containing a hyphen are marked as prereleases.
+The workflow builds `make gbc` and checks that the ROM fits the 128 KiB flash layout. A manual workflow run produces a development download. Pushing a tag beginning with `v` builds and publishes a GitHub Release titled **Photo! DX TAG**, with `Photo! DX [TAG].gbc` attached. Tags containing a hyphen are marked as prereleases. The tag must equal `v` followed by the `version` file's value, which is also displayed inside the ROM.
 
 After committing and pushing the reviewed changes, a prerelease can be published with:
 
 ```sh
-git tag v1.13-dx.1
-git push origin v1.13-dx.1
+git tag v1.13-dx.2
+git push origin v1.13-dx.2
 ```
 
-Use a new tag for each release. The workflow verifies that the remote tag exists and creates a new release; it does not replace an existing release's files. A tag such as `v1.13` publishes a stable release. The version in the tag should match the `version` file, with an optional prerelease suffix.
+Use a new tag for each release. The workflow verifies that the remote tag exists and creates a new release; it does not replace an existing release's files. A version without a prerelease suffix publishes a stable release.
 
 ## RGB camera handshake
 
@@ -276,7 +274,7 @@ The Color preference occupies bank 0 at `0xA0E0` through `0xA0E5`: `RGBS`, an en
 
 The renderer follows the continuous interrupt structure of GBDK's `examples/gb/hicolor` and the staggered palette updates described in [GBC HiColour](https://romhack.github.io/doc/gbcHiColour/). Conversion runs on the emulated CPU; the host only supplies camera pixels and checks the result.
 
-The [SameBoy test instructions](tests/sameboy/README.md) cover GB, CGB and the Advance compatibility model, real camera callbacks, filter fallback, stock save compatibility, and a PNG from the running ROM. Other ports are outside this feature's validation scope. Physical camera filters and physical consoles require hardware verification.
+The [SameBoy test instructions](tests/sameboy/README.md) cover CGB and the Advance compatibility model, real camera callbacks, filter fallback, stock save compatibility, and PNGs from the running ROM. Physical camera filters and physical consoles require hardware verification.
 
 # Showcase of images made with Photo!
 ![Showcase](doc/Images/Showcase_2.png)

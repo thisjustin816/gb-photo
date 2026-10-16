@@ -34,6 +34,7 @@
 #include "pic-n-rec.h"
 #include "load_save.h"
 #include "color_photo.h"
+#include "color_ui.h"
 
 #include "misc_assets.h"
 
@@ -398,11 +399,13 @@ static void refresh_autoexp_area(void) {
 }
 
 static void refresh_screen(void) {
+    color_ui_clear();
     screen_clear_rect(0, 0, DEVICE_SCREEN_WIDTH, DEVICE_SCREEN_HEIGHT, WHITE_ON_BLACK);
     display_last_seen(true);
     refresh_usage_indicator();
     refresh_autoexp_area();
     scrollbar_repaint_all();
+    color_ui_camera();
 }
 
 static uint8_t onPrinterProgress(void) BANKED {

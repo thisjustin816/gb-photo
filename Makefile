@@ -22,13 +22,13 @@ GBCOMPRESS = $(GBDK_HOME_UNIX)/bin/gbcompress
 #TARGETS = gb gbc pocket sms gg megaduck
 #TARGETS = gg
 #TARGETS = gbc
-TARGETS = gbc megaduck gg
+TARGETS = gbc
 
 LIBRARIES =
 
 # Configure platform specific LCC flags here:
 LCCFLAGS_gb      = $(LIBRARIES) -Wl-b_DATA=0xCEA0 -Wl-yt0xFC -Wm-ys -Wm-yn"$(PROJECTNAME)"
-LCCFLAGS_gbc     = $(LCCFLAGS_gb) -Wm-yc 
+LCCFLAGS_gbc     = $(LIBRARIES) -Wl-b_DATA=0xCEA0 -Wl-yt0xFC -Wm-yC -Wm-yn"PHOTO! DX"
 LCCFLAGS_duck    = $(LIBRARIES) -Wl-b_DATA=0xCEA0 -Wl-yt0xFC
 LCCFLAGS_sms     =
 LCCFLAGS_gg      = -Wb-reserve=1:10 -Wl-b_CODE=0x0150 -Wl-b_DATA=0xCEC0
@@ -82,6 +82,10 @@ FONT_RES    = $(foreach dir,$(RESDIR),$(notdir $(wildcard $(dir)/gfx/$(PLAT)/fon
 SPR_RES     = $(foreach dir,$(RESDIR),$(notdir $(wildcard $(dir)/gfx/$(PLAT)/sprites/*.png)))
 BKG_RES     = $(foreach dir,$(RESDIR),$(notdir $(wildcard $(dir)/gfx/$(PLAT)/backgrounds/*.png)))
 BORDER_RES  = $(foreach dir,$(RESDIR),$(notdir $(wildcard $(dir)/gfx/$(PLAT)/borders/*.png)))
+ifeq ($(EXT),gbc)
+BORDER_RES =
+BKG_RES := $(filter-out logo.png,$(BKG_RES))
+endif
 
 DATA_RES    = $(foreach dir,$(RESDIR),$(notdir $(wildcard $(dir)/data/*.bin)))
 
@@ -101,6 +105,12 @@ all: $(TARGETS) remote
 DEPS = $(DEPENDANT:%.o=%.d)
 
 -include $(DEPS)
+
+ifeq ($(EXT),gbc)
+$(OBJDIR)/color_ui.o: $(OBJDIR)/color_ui_data.h
+$(OBJDIR)/color_ui_data.h: utils/color_ui.py $(RESDIR)/gfx/gb/backgrounds/logo.png $(RESDIR)/gfx/gb/backgrounds/main_menu.png $(RESDIR)/gfx/gb/backgrounds/logo_about.png assets/art/Logo/Logo_variants_Photo!_clear.png
+	$(PYTHON) utils/color_ui.py --compressor $(GBCOMPRESS) --output $@
+endif
 
 .SECONDEXPANSION:
 $(OBJDIR)/%.c:	$(RESDIR)/audio/$(PLAT)/sounds/%.vgm $$(wildcard $(RESDIR)/audio/$(PLAT)/sounds/%.vgm.meta)
@@ -192,7 +202,6 @@ $(OBJDIR)/list.lk: $(RESOBJ) $(OBJS)
 $(BINS): $(OBJDIR)/list.lk
 	$(LCC) $(LCCFLAGS) -o $(BINDIR)/$(PROJECTNAME).$(EXT) -Wl-f$^
 	$(PYTHON) utils/romfixer.py -e gg $(BINDIR)/$(PROJECTNAME).$(EXT)
-	cp assets/photo.sav $(BINDIR)/photo.sav
 
 remote:
 	$(MAKE) -C remote
